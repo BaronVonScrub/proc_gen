@@ -4,3 +4,65 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+
+bevy = { version = "0.13", default-features = false, features = [
+    "animation",
+    "bevy_asset",
+    "bevy_gilrs",
+    "bevy_scene",
+    "bevy_winit",
+    "bevy_core_pipeline",
+    "bevy_pbr",
+    "bevy_gltf",
+    "bevy_render",
+    "bevy_sprite",
+    "bevy_text",
+    "bevy_ui",
+    "multi-threaded",
+    "png",
+    "hdr",
+    "x11",
+    "bevy_gizmos",
+    "tonemapping_luts",
+    "default_font",
+    "webgl2",
+    "bevy_debug_stepping",
+    "asset_processor",
+    "file_watcher",
+    "basis-universal",
+    "serialize"
+] }
+bevy_kira_audio = { version = "0.19", features = ["mp3"] }
+image = "0.25.1"
+glob = "0.3.1"
+bevy-inspector-egui = "0.24.0"
+bevy_egui = "0.27.0"
+rand = { version = "0.8.5", features = [] }
+wasm-bindgen = { version = "0.2.89", features = [] }
+egui_extras = { version = "0.27.2", features = ["all_loaders"]}
+bevy_atmosphere = "0.9.1"
+indexmap = "2.1.0"
+bevy_asset_loader = "0.20.1"
+rand_core = "0.6"
+bevy_rand = "0.6.0"
+bevy_prng = { version = "0.6.0", features = ["rand_chacha", "wyrand"] }
+serde = { version = "1.0.197", features = ["derive"] }
+ron = "0.8.1"
+walkdir = "2.5.0"
+bevy_utils = "0.13.2"
+tiff = "0.9.1"
+bevy_pbr = "0.13.2"
+bevy_math = "0.13.2"
+statrs = "0.16.0"
+libnoise = { version ="1.1.2", features = ["image"] }
+oxidized_navigation = { git = "https://github.com/BaronVonScrub/oxidized_navigation_rapier0.26.0", rev = "ce0d9dc", features = [ "bevy_rapier3d", "debug_draw", "rapier", "default"] }
+bevy_rapier3d = "0.26.0"
+futures = "0.3.30"
+itertools = "0.13.0"
+lazy_static = "1.4.0"
+
+[build-dependencies]
+image = "0.25.1"
+
+[patch.crates-io]
+bevy_rapier3d = { git = "https://github.com/dimforge/bevy_rapier", rev = "0110ee9" }
