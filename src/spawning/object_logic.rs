@@ -40,12 +40,12 @@ pub enum ObjectType {
 #[derive(Component, Serialize, Deserialize, Reflect)]
 #[reflect(Component, Serialize, Deserialize)]
 pub struct Selectable {
-    pub(crate) is_selected: bool,
+    pub is_selected: bool,
 }
 
 #[derive(Component)]
 pub struct Pathfinder {
-    pub(crate) path: PathState,
+    pub path: PathState,
 }
 
 pub enum PathState {

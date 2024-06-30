@@ -78,7 +78,7 @@ pub fn create_collider(collider_type: &ColliderType) -> Option<Collider> {
 }
 
 #[derive(Resource)]
-pub(crate) struct GenRng(WyRand);
+pub struct GenRng(WyRand);
 
 impl GenRng {
     pub fn rng_mut(&mut self) -> &mut WyRand {

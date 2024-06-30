@@ -5,13 +5,13 @@ use bevy_asset_loader::prelude::AssetCollection;
 use bevy_pbr::StandardMaterial;
 
 #[derive(AssetCollection, Resource)]
-pub(crate) struct StructureModels {
+pub struct StructureModels {
     //#[asset(path = "models", collection)]
     //pub(crate) models: Vec<UntypedHandle>
 }
 
 #[derive(Resource)]
-pub(crate) struct MaterialCache {
+pub struct MaterialCache {
     map: HashMap<String, Handle<StandardMaterial>>,
 }
 
