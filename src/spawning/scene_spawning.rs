@@ -2,11 +2,10 @@ use std::path::Path;
 use bevy::prelude::*;
 use bevy_rapier3d::prelude::{ActiveEvents, ContactForceEventThreshold, Damping, Dominance, LockedAxes, RigidBody, Sleeping};
 use oxidized_navigation::NavMeshAffector;
-use crate::agent_pathfinding::{Pathfinder, PathState};
-use crate::proc_gen::spawning::object_logic::ObjectType;
-use crate::proc_gen::core::structure_key::StructureKey;
-use crate::proc_gen::core::collider::ColliderBehaviour;
-use crate::proc_gen::spawning::helpers::*;
+use crate::spawning::object_logic::{ObjectType, Selectable};
+use crate::core::structure_key::StructureKey;
+use crate::core::collider::ColliderBehaviour;
+use crate::spawning::helpers::*;
 
 pub(crate) fn spawn_scene_from_path(
     commands: &mut Commands,
@@ -41,7 +40,7 @@ pub(crate) fn spawn_scene_from_path(
             .insert(object_type.clone());
 
         if *selectable {
-            commands.entity(parent_entity).insert(crate::selection_manager::Selectable { is_selected: false });
+            commands.entity(parent_entity).insert(Selectable { is_selected: false });
         }
 
         if let Some(internal_collider) = collider.clone() {

@@ -1,12 +1,12 @@
 use bevy::prelude::*;
+use bevy_prng::WyRand;
 use bevy_rapier3d::prelude::*;
-use crate::proc_gen::core::collider::ColliderType;
-use crate::proc_gen::core::rand_data::RandData;
+use crate::core::collider::ColliderType;
+use crate::core::rand_data::RandData;
 use statrs::distribution::{Normal};
 use rand::Rng;
 use rand::distributions::Distribution;
-use crate::generation::GenRng;
-use crate::proc_gen::spawning::euler_transform::EulerTransform;
+use crate::spawning::euler_transform::EulerTransform;
 
 pub fn reflect_point(
     point: Vec3,
@@ -74,5 +74,14 @@ pub fn create_collider(collider_type: &ColliderType) -> Option<Collider> {
         ColliderType::Triangle { a, b, c } => Some(Collider::triangle(*a, *b, *c)),
         ColliderType::RoundTriangle { a, b, c, border_radius } =>
             Some(Collider::round_triangle(*a, *b, *c, *border_radius)),
+    }
+}
+
+#[derive(Resource)]
+pub(crate) struct GenRng(WyRand);
+
+impl GenRng {
+    pub fn rng_mut(&mut self) -> &mut WyRand {
+        &mut self.0
     }
 }

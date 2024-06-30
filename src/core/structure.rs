@@ -1,13 +1,13 @@
-use crate::proc_gen::spawning::object_logic::Ownership;
+use crate::spawning::object_logic::Ownership;
 use bevy_prng::WyRand;
-use crate::proc_gen::spawning::euler_transform::EulerTransform;
+use crate::spawning::euler_transform::EulerTransform;
 use serde::{Serialize, Deserialize};
 use rand::prelude::SliceRandom;
-use crate::proc_gen::core::structure_key::StructureKey;
-use crate::proc_gen::core::structure_reference::StructureReference;
+use crate::core::structure_key::StructureKey;
+use crate::core::structure_reference::StructureReference;
 
-use crate::proc_gen::core::structure_error::StructureError;
-use crate::proc_gen::management::structure_management::import_structure;
+use crate::core::structure_error::StructureError;
+use crate::management::structure_management::import_structure;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Structure {

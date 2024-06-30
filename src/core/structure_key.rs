@@ -1,20 +1,20 @@
-use crate::proc_gen::serialization::serialization::SerializableFogSettings;
-use crate::proc_gen::serialization::serialization::SerializableAmbientLight;
-use crate::proc_gen::serialization::serialization::SerializableDirectionalLight;
-use crate::proc_gen::serialization::serialization::SerializableSpotLight;
-use crate::proc_gen::serialization::serialization::SerializablePointLight;
+use crate::serialization::serialization::SerializableFogSettings;
+use crate::serialization::serialization::SerializableAmbientLight;
+use crate::serialization::serialization::SerializableDirectionalLight;
+use crate::serialization::serialization::SerializableSpotLight;
+use crate::serialization::serialization::SerializablePointLight;
 use serde::{Serialize, Deserialize};
 use bevy::prelude::*;
-use crate::proc_gen::core::collider::ColliderInfo;
-use crate::proc_gen::core::fbm_data::FBMData;
-use crate::proc_gen::core::rand_data::RandData;
-use crate::proc_gen::core::sample_size::SampleSize;
-use crate::proc_gen::core::spread_data::SpreadData;
-use crate::proc_gen::core::structure_reference::StructureReference;
-use crate::proc_gen::core::tags::Tags;
-use crate::proc_gen::management::structure_management::import_structure;
-use crate::proc_gen::spawning::euler_transform::EulerTransform;
-use crate::proc_gen::spawning::object_logic::{ObjectType, Ownership};
+use crate::core::collider::ColliderInfo;
+use crate::core::fbm_data::FBMData;
+use crate::core::rand_data::RandData;
+use crate::core::sample_size::SampleSize;
+use crate::core::spread_data::SpreadData;
+use crate::core::structure_reference::StructureReference;
+use crate::core::tags::Tags;
+use crate::management::structure_management::import_structure;
+use crate::spawning::euler_transform::EulerTransform;
+use crate::spawning::object_logic::{ObjectType, Ownership};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum StructureKey {

@@ -1,6 +1,6 @@
 use serde::{Serialize, Deserialize};
-use crate::proc_gen::core::structure::Structure;
-use crate::proc_gen::spawning::object_logic::Ownership;
+use crate::core::structure::Structure;
+use crate::spawning::object_logic::Ownership;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum StructureReference {

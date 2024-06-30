@@ -1,17 +1,17 @@
-use crate::proc_gen::spawning::mesh_spawning::spawn_mesh;
+use crate::spawning::mesh_spawning::spawn_mesh;
 use bevy::prelude::*;
 use bevy_kira_audio::{Audio, AudioChannel, AudioControl};
 use bevy_kira_audio::prelude::AudioEmitter;
-use crate::audio_manager::SoundEffects;
-use crate::generation::GenRng;
-use crate::material_autoloader::MaterialCache;
-use crate::proc_gen::spawning::structure_spawning::spawn_structure_by_name;
-use crate::proc_gen::spawning::scene_spawning::spawn_scene_from_path;
-use crate::proc_gen::core::structure_key::StructureKey;
-use crate::proc_gen::core::tmaterial::TMaterial;
-use crate::proc_gen::spawning::euler_transform::EulerTransform;
-use crate::proc_gen::core::components::MainCamera;
-use crate::proc_gen::core::components::MainDirectionalLight;
+use crate::spawning::structure_spawning::spawn_structure_by_name;
+use crate::spawning::scene_spawning::spawn_scene_from_path;
+use crate::core::structure_key::StructureKey;
+use crate::core::tmaterial::TMaterial;
+use crate::spawning::euler_transform::EulerTransform;
+use crate::core::components::MainCamera;
+use crate::core::components::MainDirectionalLight;
+use crate::management::audio_management::SoundEffects;
+use crate::serialization::caching::{MaterialCache};
+use crate::spawning::helpers::GenRng;
 
 #[derive(Event)]
 pub enum ObjectSpawnEvent {

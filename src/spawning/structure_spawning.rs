@@ -1,19 +1,19 @@
 use bevy::prelude::*;
 use rand::Rng;
-pub(crate) use crate::proc_gen::core::structure::{Structure};
-use crate::proc_gen::core::structure_key::StructureKey;
-use crate::proc_gen::core::structure_reference::StructureReference;
-use crate::proc_gen::core::structure_error::StructureError;
-use crate::proc_gen::core::tags::Tags;
-use crate::proc_gen::management::structure_management::import_structure;
-use crate::proc_gen::spawning::transformation::*;
+pub(crate) use crate::core::structure::{Structure};
+use crate::core::structure_key::StructureKey;
+use crate::core::structure_reference::StructureReference;
+use crate::core::structure_error::StructureError;
+use crate::core::tags::Tags;
+use crate::management::structure_management::import_structure;
+use crate::spawning::transformation::*;
 use crate::generation::GenRng;
-use crate::proc_gen::core::spread_data::SpreadData;
-use crate::proc_gen::spawning::euler_transform::EulerTransform;
-use crate::proc_gen::spawning::helpers::{jiggle_transform, reflect_point};
-use crate::proc_gen::spawning::light_spawning::{spawn_point_light, spawn_spot_light};
-use crate::proc_gen::spawning::scene_spawning::spawn_scene_from_path;
-use crate::proc_gen::systems::events::{AmbLightEvent, BGMusicEvent, DirLightEvent, FogEvent, SFXEvent};
+use crate::core::spread_data::SpreadData;
+use crate::spawning::euler_transform::EulerTransform;
+use crate::spawning::helpers::{GenRng, jiggle_transform, reflect_point};
+use crate::spawning::light_spawning::{spawn_point_light, spawn_spot_light};
+use crate::spawning::scene_spawning::spawn_scene_from_path;
+use crate::systems::events::{AmbLightEvent, BGMusicEvent, DirLightEvent, FogEvent, SFXEvent};
 
 pub(crate) fn spawn_structure_by_name(
     commands: &mut Commands,

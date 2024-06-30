@@ -1,8 +1,8 @@
 use bevy_rapier3d::prelude::{ActiveEvents, Collider, RigidBody};
 use bevy::prelude::*;
 use oxidized_navigation::NavMeshAffector;
-use crate::material_autoloader::MaterialCache;
-use crate::proc_gen::core::tmaterial::TMaterial;
+use crate::core::tmaterial::TMaterial;
+use crate::serialization::caching::MaterialCache;
 
 pub fn spawn_mesh(
     commands: &mut Commands,

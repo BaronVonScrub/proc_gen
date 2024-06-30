@@ -1,4 +1,4 @@
-use crate::proc_gen::core::fbm_data::FBMData;
+use crate::core::fbm_data::FBMData;
 use serde::{Serialize, Deserialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

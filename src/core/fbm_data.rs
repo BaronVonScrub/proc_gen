@@ -1,4 +1,4 @@
-use crate::proc_gen::core::seeded_or_not::SeededOrNot;
+use crate::core::seeded_or_not::SeededOrNot;
 use serde::{Serialize, Deserialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

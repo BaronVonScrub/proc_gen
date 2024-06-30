@@ -3,7 +3,7 @@ use std::sync::Mutex;
 use std::fs::File;
 use ron::de::{from_reader, SpannedError};
 use lazy_static::lazy_static;
-use crate::proc_gen::core::structure::Structure;
+use crate::core::structure::Structure;
 
 lazy_static! {
     static ref STRUCTURE_CACHE: Mutex<HashMap<String, Structure>> = Mutex::new(HashMap::new());

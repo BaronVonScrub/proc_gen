@@ -1,11 +1,11 @@
 use libnoise::{Generator, Source};
 use bevy::prelude::*;
-use crate::proc_gen::core::structure_key::StructureKey;
-use crate::proc_gen::core::sample_size::SampleSize;
+use crate::core::structure_key::StructureKey;
+use crate::core::sample_size::SampleSize;
 use rand::Rng;
-use crate::generation::GenRng;
-use crate::proc_gen::core::seeded_or_not::SeededOrNot;
-use crate::proc_gen::spawning::euler_transform::EulerTransform;
+use crate::core::seeded_or_not::SeededOrNot;
+use crate::spawning::euler_transform::EulerTransform;
+use crate::spawning::helpers::GenRng;
 
 pub fn get_looped_position_list(origin: Vec3, transform: EulerTransform, x_times: usize) -> Vec<Vec3> {
     let mut positions = Vec::new();
