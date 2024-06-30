@@ -2,7 +2,7 @@ use std::path::Path;
 use bevy::prelude::*;
 use bevy_rapier3d::prelude::{ActiveEvents, ContactForceEventThreshold, Damping, Dominance, LockedAxes, RigidBody, Sleeping};
 use oxidized_navigation::NavMeshAffector;
-use crate::spawning::object_logic::{ObjectType, Selectable};
+use crate::spawning::object_logic::{ObjectType, Pathfinder, PathState, Selectable};
 use crate::core::structure_key::StructureKey;
 use crate::core::collider::ColliderBehaviour;
 use crate::spawning::helpers::*;

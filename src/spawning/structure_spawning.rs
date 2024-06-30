@@ -7,7 +7,6 @@ use crate::core::structure_error::StructureError;
 use crate::core::tags::Tags;
 use crate::management::structure_management::import_structure;
 use crate::spawning::transformation::*;
-use crate::generation::GenRng;
 use crate::core::spread_data::SpreadData;
 use crate::spawning::euler_transform::EulerTransform;
 use crate::spawning::helpers::{GenRng, jiggle_transform, reflect_point};
