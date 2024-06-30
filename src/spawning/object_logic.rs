@@ -7,6 +7,8 @@ use bevy_inspector_egui::InspectorOptions;
 use serde::{Deserialize, Serialize};
 use bevy_inspector_egui::prelude::ReflectInspectorOptions;
 use oxidized_navigation::query::FindPathError;
+use bevy::reflect::ReflectDeserialize;
+use bevy::reflect::ReflectSerialize;
 
 pub(crate) struct ObjectLogicPlugin;
 impl Plugin for ObjectLogicPlugin {
