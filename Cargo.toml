@@ -1,7 +1,11 @@
 [package]
 name = "proc_gen"
 version = "0.1.0"
+authors = ["Your Name <your.email@example.com>"]
 edition = "2021"
+description = "Procedural generation library"
+license = "MIT"
+repository = "https://github.com/BaronVonScrub/proc_gen"
 
 [dependencies]
 
@@ -66,3 +70,7 @@ image = "0.25.1"
 
 [patch.crates-io]
 bevy_rapier3d = { git = "https://github.com/dimforge/bevy_rapier", rev = "0110ee9" }
+
+[lib]
+name = "proc_gen"
+path = "src/lib.rs"
