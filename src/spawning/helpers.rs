@@ -6,6 +6,7 @@ use crate::core::rand_data::RandData;
 use statrs::distribution::{Normal};
 use rand::Rng;
 use rand::distributions::Distribution;
+use rand_core::SeedableRng;
 use crate::spawning::euler_transform::EulerTransform;
 
 pub fn reflect_point(
@@ -81,6 +82,11 @@ pub fn create_collider(collider_type: &ColliderType) -> Option<Collider> {
 pub struct GenRng(WyRand);
 
 impl GenRng {
+
+    pub fn new(seed: u64) -> Self {
+        GenRng(WyRand::seed_from_u64(seed)) // Use the appropriate public method to create WyRand
+    }
+
     pub fn rng_mut(&mut self) -> &mut WyRand {
         &mut self.0
     }

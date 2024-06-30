@@ -10,7 +10,7 @@ use oxidized_navigation::query::FindPathError;
 use bevy::reflect::ReflectDeserialize;
 use bevy::reflect::ReflectSerialize;
 
-pub(crate) struct ObjectLogicPlugin;
+pub struct ObjectLogicPlugin;
 impl Plugin for ObjectLogicPlugin {
     fn build(&self, app: &mut App) {
         app.register_type::<Ownership>()
