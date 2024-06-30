@@ -4,9 +4,9 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct EulerTransform {
-    pub(crate) translation: (f32, f32, f32),   // Translation vector
-    pub(crate) rotation: (f32, f32, f32),      // Rotation in Euler angles (degrees)
-    pub(crate) scale: (f32, f32, f32),         // Scale vector
+    pub translation: (f32, f32, f32),   // Translation vector
+    pub rotation: (f32, f32, f32),      // Rotation in Euler angles (degrees)
+    pub scale: (f32, f32, f32),         // Scale vector
 }
 
 impl Default for EulerTransform {
