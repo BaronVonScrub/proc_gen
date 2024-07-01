@@ -3,7 +3,7 @@ pub enum StructureError {
     CycleDetected(String),
     ImportFailed(String),
     Other(String),
-    InheritOwnershipAtTopLevel,
+    InheritOwnershipAtTopLevel(String),
 }
 
 impl From<&str> for StructureError {

@@ -45,7 +45,9 @@ impl<'a> TryFrom<&'a StructureReference> for Structure {
                 if let Ownership::Team(team_id) = ownership {
                     propagate_team_ownership(&mut cloned_structure, *team_id);
                 } else if let Ownership::Inherit = ownership {
-                    return Err(StructureError::InheritOwnershipAtTopLevel);
+                    return Err(StructureError::InheritOwnershipAtTopLevel(
+                        format!("Inherit ownership cannot be used at the top level for structure '{:?}'", structure),
+                    ));
                 }
 
                 Ok(cloned_structure)
@@ -56,13 +58,16 @@ impl<'a> TryFrom<&'a StructureReference> for Structure {
                 if let Ownership::Team(team_id) = ownership {
                     propagate_team_ownership(&mut imported_structure, *team_id);
                 } else if let Ownership::Inherit = ownership {
-                    return Err(StructureError::InheritOwnershipAtTopLevel);
+                    return Err(StructureError::InheritOwnershipAtTopLevel(
+                        format!("Inherit ownership cannot be used at the top level for structure '{}'", structure),
+                    ));
                 }
 
                 Ok(imported_structure)
             }
         }
     }
+
 }
 
 pub(crate) fn propagate_team_ownership(structure: &mut Structure, team_id: u8) {
