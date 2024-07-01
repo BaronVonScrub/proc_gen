@@ -74,3 +74,7 @@ bevy_rapier3d = { git = "https://github.com/dimforge/bevy_rapier", rev = "0110ee
 [lib]
 name = "proc_gen"
 path = "src/lib.rs"
+
+[[bin]]
+name = "dummy"
+path = "src/dummy.rs"

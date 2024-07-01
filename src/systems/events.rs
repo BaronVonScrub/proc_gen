@@ -12,6 +12,8 @@ use crate::core::components::MainDirectionalLight;
 use crate::management::audio_management::SoundEffects;
 use crate::serialization::caching::{MaterialCache};
 use crate::spawning::helpers::GenRng;
+use crate::core::structure_reference::StructureReference;
+use crate::core::tags::Tags;
 
 #[derive(Event)]
 pub enum ObjectSpawnEvent {
@@ -67,6 +69,16 @@ pub enum SFXEvent {
     }
 }
 
+#[derive(Event)]
+pub enum SelectiveReplacementEvent {
+    Replace {
+        entity: Entity,
+        replacement_reference: StructureReference,
+        tags: Tags,
+        replace_count: usize,
+    }
+}
+
 pub fn object_spawn_reader_system(
     mut spawn_reader: EventReader<ObjectSpawnEvent>,
     asset_server: Res<AssetServer>,
@@ -78,7 +90,8 @@ pub fn object_spawn_reader_system(
     mut amb_light_writer: EventWriter<AmbLightEvent>,
     mut fog_writer: EventWriter<FogEvent>,
     mut music_writer: EventWriter<BGMusicEvent>,
-    mut sfx_writer: EventWriter<SFXEvent>
+    mut sfx_writer: EventWriter<SFXEvent>,
+    mut selective_replacement_writer: EventWriter<SelectiveReplacementEvent>
 ) {
     for spawn_event in spawn_reader.read() {
         match spawn_event {
@@ -114,6 +127,7 @@ pub fn object_spawn_reader_system(
                     &mut fog_writer,
                     &mut music_writer,
                     &mut sfx_writer,
+                    &mut selective_replacement_writer,
                     None
                 ) {
                     Ok(_) => {},
@@ -206,4 +220,63 @@ pub fn background_music_updater_system(
             }
         }
     }
+}
+
+pub fn selective_replacement_reader_system(
+    mut commands: Commands,
+    mut replacement_reader: EventReader<SelectiveReplacementEvent>,
+    //mut spawn_writer: EventWriter<ObjectSpawnEvent>,
+    parent_query: Query<&Parent>,
+    mut query: Query<(Entity, &Tags)>,
+) {
+    for event in replacement_reader.read() {
+        match event {
+            SelectiveReplacementEvent::Replace {
+                entity,
+                replacement_reference,
+                tags,
+                replace_count,
+            } => {
+                // Ensure only StructureReference::Ref is accepted
+                if let StructureReference::Ref { .. } = replacement_reference {
+                    // Find entities with matching tags
+                    let matching_entities: Vec<Entity> = query
+                        .iter_mut()
+                        .filter_map(|(entity, entity_tags)| {
+                            if entity_tags.0.iter().any(|tag| tags.0.contains(tag)) {
+                                Some(entity)
+                            } else {
+                                None
+                            }
+                        })
+                        .collect();
+
+                    // Filter out all those that are NOT descendants of the entity listed in the Replace enum
+                    let descendant_entities: Vec<Entity> = matching_entities
+                        .into_iter()
+                        .filter(|&e| is_descendant(entity, e, &parent_query))
+                        .collect();
+
+                    // Process the filtered descendant entities
+                    for descendant in descendant_entities.iter().take(*replace_count) {
+                        // Example: Despawn the entity and send a spawn event
+                        commands.entity(*descendant).despawn_recursive();
+                    }
+                }
+            }
+        }
+    }
+}
+
+fn is_descendant(ancestor: &Entity, child: Entity, parent_query: &Query<&Parent>) -> bool {
+    let mut current_entity = child;
+
+    while let Ok(parent) = parent_query.get(current_entity) {
+        if parent.get() == *ancestor {
+            return true;
+        }
+        current_entity = parent.get();
+    }
+
+    false
 }

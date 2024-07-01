@@ -3,7 +3,7 @@ use serde::{Serialize, Deserialize};
 use bevy_inspector_egui::prelude::*;
 use std::slice::Iter;
 
-#[derive(Reflect, Component, Default, InspectorOptions, Serialize, Deserialize)]
+#[derive(Reflect, Component, Default, InspectorOptions, Serialize, Deserialize, Debug, Clone)]
 #[reflect(Component, InspectorOptions)]
 pub struct Tags(pub Vec<String>);
 

@@ -12,7 +12,7 @@ use crate::spawning::euler_transform::EulerTransform;
 use crate::spawning::helpers::{GenRng, jiggle_transform, reflect_point};
 use crate::spawning::light_spawning::{spawn_point_light, spawn_spot_light};
 use crate::spawning::scene_spawning::spawn_scene_from_path;
-use crate::systems::events::{AmbLightEvent, BGMusicEvent, DirLightEvent, FogEvent, SFXEvent};
+use crate::systems::events::{AmbLightEvent, BGMusicEvent, DirLightEvent, FogEvent, SelectiveReplacementEvent, SFXEvent};
 
 pub(crate) fn spawn_structure_by_name(
     commands: &mut Commands,
@@ -26,6 +26,7 @@ pub(crate) fn spawn_structure_by_name(
     fog_writer: &mut EventWriter<FogEvent>,
     music_writer: &mut EventWriter<BGMusicEvent>,
     sfx_writer: &mut EventWriter<SFXEvent>,
+    selective_replacement_writer: &mut EventWriter<SelectiveReplacementEvent>,
     parent: Option<Entity>
 ) -> Result<Option<Entity>, StructureError> {
     if struct_stack.contains(&structure_name) {
@@ -66,6 +67,7 @@ pub(crate) fn spawn_structure_by_name(
                 fog_writer,
                 music_writer,
                 sfx_writer,
+                selective_replacement_writer,
                 Some(ent)
             )
         },
@@ -101,6 +103,7 @@ pub(crate) fn spawn_structure_by_data(
     fog_writer: &mut EventWriter<FogEvent>,
     music_writer: &mut EventWriter<BGMusicEvent>,
     sfx_writer: &mut EventWriter<SFXEvent>,
+    selective_replacement_writer: &mut EventWriter<SelectiveReplacementEvent>,
     parent: Option<Entity>
 ) -> Result<Option<Entity>, StructureError> {
     let entity = commands.spawn(PbrBundle { ..default() })
@@ -132,6 +135,7 @@ pub(crate) fn spawn_structure_by_data(
                     fog_writer,
                     music_writer,
                     sfx_writer,
+                    selective_replacement_writer,
                     parent
                 )?
             }
@@ -153,6 +157,7 @@ pub(crate) fn spawn_structure_by_data(
                         fog_writer,
                         music_writer,
                         sfx_writer,
+                        selective_replacement_writer,
                         parent
                     )?
                 } else {
@@ -174,6 +179,7 @@ pub(crate) fn spawn_structure_by_data(
                     fog_writer,
                     music_writer,
                     sfx_writer,
+                    selective_replacement_writer,
                     parent
                 )?
             },
@@ -192,6 +198,7 @@ pub(crate) fn spawn_structure_by_data(
                     fog_writer,
                     music_writer,
                     sfx_writer,
+                    selective_replacement_writer,
                     parent
                 )?
             },
@@ -232,6 +239,7 @@ pub(crate) fn spawn_structure_by_data(
                                         fog_writer,
                                         music_writer,
                                         sfx_writer,
+                                        selective_replacement_writer,
                                         parent)?
             }
             StructureKey::DirectionalLight(light) => {
@@ -298,6 +306,7 @@ pub(crate) fn spawn_structure_by_data(
                     fog_writer,
                     music_writer,
                     sfx_writer,
+                    selective_replacement_writer,
                     parent
                 )?
             }
@@ -354,6 +363,7 @@ pub(crate) fn spawn_structure_by_data(
                     fog_writer,
                     music_writer,
                     sfx_writer,
+                    selective_replacement_writer,
                     parent
                 )?
             }
@@ -396,6 +406,7 @@ pub(crate) fn spawn_structure_by_data(
                     fog_writer,
                     music_writer,
                     sfx_writer,
+                    selective_replacement_writer,
                     parent
                 )?
             }
@@ -436,6 +447,7 @@ pub(crate) fn spawn_structure_by_data(
                     fog_writer,
                     music_writer,
                     sfx_writer,
+                    selective_replacement_writer,
                     parent
                 )?;
 
@@ -451,6 +463,7 @@ pub(crate) fn spawn_structure_by_data(
                     fog_writer,
                     music_writer,
                     sfx_writer,
+                    selective_replacement_writer,
                     parent
                 )?;
 
@@ -487,8 +500,44 @@ pub(crate) fn spawn_structure_by_data(
                     fog_writer,
                     music_writer,
                     sfx_writer,
+                    selective_replacement_writer,
                     parent
                 )?
+            }
+            StructureKey::SelectiveReplacement { initial_reference, replacement_reference, tags, replace_count } => {
+                // Convert initial structure reference to a structure
+                if let Ok(initial_structure) = Structure::try_from(initial_reference) {
+                    // Spawn the initial structure
+                    let child = spawn_structure_by_data(
+                        commands,
+                        asset_server,
+                        &initial_structure,
+                        combined_transform,
+                        struct_stack,
+                        gen_rng,
+                        dir_light_writer,
+                        amb_light_writer,
+                        fog_writer,
+                        music_writer,
+                        sfx_writer,
+                        selective_replacement_writer,
+                        Some(entity),
+                    )?;
+
+                    if let Some(child) = child {
+                        // Send the SelectiveReplacementEvent
+                        selective_replacement_writer.send(SelectiveReplacementEvent::Replace {
+                            entity: child,
+                            replacement_reference: replacement_reference.clone(),
+                            tags: tags.clone(),
+                            replace_count: *replace_count,
+                        });
+                    }
+
+                    Some(entity)
+                } else {
+                    None
+                }
             }
         };
 

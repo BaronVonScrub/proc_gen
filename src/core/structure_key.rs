@@ -86,6 +86,12 @@ pub enum StructureKey {
         reflection_point: Vec3,
         reflect_child: bool,
     },
+    SelectiveReplacement {
+        initial_reference: StructureReference,
+        replacement_reference: StructureReference,
+        tags: Tags,
+        replace_count: usize,
+    },
 }
 
 impl StructureKey {
@@ -138,6 +144,10 @@ impl StructureKey {
             StructureKey::NestingLoop { reference, .. } => match reference {
                 StructureReference::Raw { structure, .. } => format!("NLoop {:?}", structure.structure_name.clone()),
                 StructureReference::Ref { structure, .. } => format!("NLoop {:?}", structure.clone()),
+            },
+            StructureKey::SelectiveReplacement { initial_reference, .. } => match initial_reference {
+                StructureReference::Raw { structure, .. } => format!("SelectiveReplacement {:?}", structure.structure_name.clone()),
+                StructureReference::Ref { structure, .. } => format!("SelectiveReplacement {:?}", structure.clone()),
             },
         }
     }
