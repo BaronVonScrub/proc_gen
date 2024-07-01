@@ -11,7 +11,6 @@ use crate::core::rand_data::RandData;
 use crate::core::sample_size::SampleSize;
 use crate::core::spread_data::SpreadData;
 use crate::core::structure_reference::StructureReference;
-use crate::core::tags::Tags;
 use crate::management::structure_management::import_structure;
 use crate::spawning::euler_transform::EulerTransform;
 use crate::spawning::object_logic::{ObjectType, Ownership};
@@ -89,7 +88,7 @@ pub enum StructureKey {
     SelectiveReplacement {
         initial_reference: StructureReference,
         replacement_reference: StructureReference,
-        tags: Tags,
+        tags: Vec<String>,
         replace_count: usize,
     },
 }
@@ -152,7 +151,7 @@ impl StructureKey {
         }
     }
 
-    pub fn get_tags(&self) -> Option<Tags> {
+    pub fn get_tags(&self) -> Option<Vec<String>> {
         let tags = match self {
             StructureKey::Nest(reference) => Self::extract_tags(reference),
             StructureKey::Choose { list } => Self::extract_tags(list),
@@ -164,7 +163,7 @@ impl StructureKey {
             StructureKey::NoiseSpawn { reference, .. } => Self::extract_tags(reference),
             StructureKey::PathSpawn { reference, .. } => Self::extract_tags(reference),
             StructureKey::Reflection { reference, .. } => Self::extract_tags(reference),
-            _ => Tags(Vec::new()), // Other variants do not contain a StructureReference
+            _ => Vec::new(), // Other variants do not contain a StructureReference
         };
 
         if tags.len() == 0 {
@@ -174,13 +173,13 @@ impl StructureKey {
         }
     }
 
-    fn extract_tags(reference: &StructureReference) -> Tags {
+    fn extract_tags(reference: &StructureReference) -> Vec<String> {
         match reference {
             StructureReference::Raw { structure, .. } => structure.tags.clone(),
             StructureReference::Ref { structure, .. } => {
                 match import_structure(structure.clone()) {
                     Ok(imported_structure) => imported_structure.tags,
-                    Err(_) => Tags(vec!["Error".to_string()]), // Insert "Error" tag if import fails
+                    Err(_) => vec!["Error".to_string()], // Insert "Error" tag if import fails
                 }
             }
         }

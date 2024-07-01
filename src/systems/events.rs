@@ -74,7 +74,7 @@ pub enum SelectiveReplacementEvent {
     Replace {
         entity: Entity,
         replacement_reference: StructureReference,
-        tags: Tags,
+        tags: Vec<String>,
         replace_count: usize,
     }
 }

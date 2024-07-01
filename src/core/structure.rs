@@ -7,13 +7,12 @@ use crate::core::structure_key::StructureKey;
 use crate::core::structure_reference::StructureReference;
 
 use crate::core::structure_error::StructureError;
-use crate::core::tags::Tags;
 use crate::management::structure_management::import_structure;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Structure {
     pub structure_name: String,
-    pub tags: Tags,
+    pub tags: Vec<String>,
     pub data: Vec<(StructureKey, EulerTransform)>,
 }
 
