@@ -176,10 +176,10 @@ impl StructureKey {
 
     fn extract_tags(reference: &StructureReference) -> Tags {
         match reference {
-            StructureReference::Raw { structure, .. } => Tags(structure.tags.clone()),
+            StructureReference::Raw { structure, .. } => structure.tags.clone(),
             StructureReference::Ref { structure, .. } => {
                 match import_structure(structure.clone()) {
-                    Ok(imported_structure) => Tags(imported_structure.tags),
+                    Ok(imported_structure) => imported_structure.tags,
                     Err(_) => Tags(vec!["Error".to_string()]), // Insert "Error" tag if import fails
                 }
             }

@@ -50,7 +50,7 @@ pub(crate) fn spawn_structure_by_name(
 
     let result = match import_structure(structure_name.clone()) {
         Ok(structure) => {
-            let tags = Tags(structure.tags.clone());
+            let tags = structure.tags.clone();
             if tags.len() != 0 {
                 commands.entity(ent).insert(tags);
             }
@@ -215,7 +215,7 @@ pub(crate) fn spawn_structure_by_data(
 
                 let structure = Structure {
                     structure_name: "Loop".to_string(),
-                    tags: vec![],
+                    tags: Tags(vec![]),
                     data: positions.into_iter().zip(child_transforms.iter())
                         .map(|(pos, transform)| {
                             let euler_transform = EulerTransform {
@@ -290,7 +290,7 @@ pub(crate) fn spawn_structure_by_data(
 
                 let structure = Structure {
                     structure_name: "Rand".to_string(),
-                    tags: vec![],
+                    tags: Tags(vec![]),
                     data: vec![(StructureKey::Nest(reference.clone()), jiggled)]
                 };
 
@@ -331,7 +331,7 @@ pub(crate) fn spawn_structure_by_data(
 
                 let structure_unwrapped = Structure {
                     structure_name: "Noise Spawn".to_string(),
-                    tags: vec![],
+                    tags: Tags(vec![]),
                     data: struc_data
                 };
 
@@ -345,7 +345,7 @@ pub(crate) fn spawn_structure_by_data(
 
                 let structure = Structure {
                     structure_name: "Nested Noise Spawn".to_string(),
-                    tags: vec![],
+                    tags: Tags(vec![]),
                     data: vec![
                         (StructureKey::Nest(raw_nesting), parent_transform.into())
                     ],
@@ -390,7 +390,7 @@ pub(crate) fn spawn_structure_by_data(
 
                 let structure = Structure {
                     structure_name: "Path Spawn".to_string(),
-                    tags: vec![],
+                    tags: Tags(vec![]),
                     data: struc_data
                 };
 
@@ -484,7 +484,7 @@ pub(crate) fn spawn_structure_by_data(
 
                 let structure = Structure {
                     structure_name: "Nesting Loop".to_string(),
-                    tags: vec![],
+                    tags: Tags(vec![]),
                     data: structure_data,
                 };
 
@@ -529,7 +529,7 @@ pub(crate) fn spawn_structure_by_data(
                         selective_replacement_writer.send(SelectiveReplacementEvent::Replace {
                             entity: child,
                             replacement_reference: replacement_reference.clone(),
-                            tags: tags.0.clone(),
+                            tags: tags.clone(),
                             replace_count: *replace_count,
                         });
                     }

@@ -7,12 +7,13 @@ use crate::core::structure_key::StructureKey;
 use crate::core::structure_reference::StructureReference;
 
 use crate::core::structure_error::StructureError;
+use crate::core::tags::Tags;
 use crate::management::structure_management::import_structure;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Structure {
     pub structure_name: String,
-    pub tags: Vec<String>,
+    pub tags: Tags,
     pub data: Vec<(StructureKey, EulerTransform)>,
 }
 
@@ -29,7 +30,7 @@ impl Structure {
 
         Structure {
             structure_name: format!("{:?} Random Substructure", self.structure_name),
-            tags: vec![],
+            tags: self.tags.clone(),
             data: selected_data,
         }
     }
