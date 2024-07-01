@@ -529,7 +529,7 @@ pub(crate) fn spawn_structure_by_data(
                         selective_replacement_writer.send(SelectiveReplacementEvent::Replace {
                             entity: child,
                             replacement_reference: replacement_reference.clone(),
-                            tags: tags.clone(),
+                            tags: tags.0.clone(),
                             replace_count: *replace_count,
                         });
                     }
