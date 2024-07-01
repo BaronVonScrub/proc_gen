@@ -74,7 +74,7 @@ pub enum SelectiveReplacementEvent {
     Replace {
         entity: Entity,
         replacement_reference: StructureReference,
-        tags: Tags,
+        tags: Vec<String>,
         replace_count: usize,
     }
 }
@@ -243,7 +243,7 @@ pub fn selective_replacement_reader_system(
                     let matching_entities: Vec<Entity> = query
                         .iter_mut()
                         .filter_map(|(entity, entity_tags)| {
-                            if entity_tags.0.iter().any(|tag| tags.0.contains(tag)) {
+                            if entity_tags.0.iter().any(|tag| tags.contains(tag)) {
                                 Some(entity)
                             } else {
                                 None
