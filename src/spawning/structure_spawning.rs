@@ -505,39 +505,41 @@ pub(crate) fn spawn_structure_by_data(
                 )?
             }
             StructureKey::SelectiveReplacement { initial_reference, replacement_reference, tags, replace_count } => {
-                // Convert initial structure reference to a structure
-                if let Ok(initial_structure) = Structure::try_from(initial_reference) {
-                    // Spawn the initial structure
-                    let child = spawn_structure_by_data(
-                        commands,
-                        asset_server,
-                        &initial_structure,
-                        combined_transform,
-                        struct_stack,
-                        gen_rng,
-                        dir_light_writer,
-                        amb_light_writer,
-                        fog_writer,
-                        music_writer,
-                        sfx_writer,
-                        selective_replacement_writer,
-                        Some(entity),
-                    )?;
+                let child = commands.spawn(PbrBundle { ..default() }).id();
 
-                    if let Some(child) = child {
-                        // Send the SelectiveReplacementEvent
-                        selective_replacement_writer.send(SelectiveReplacementEvent::Replace {
-                            entity: child,
-                            replacement_reference: replacement_reference.clone(),
-                            tags: tags.clone(),
-                            replace_count: *replace_count,
-                        });
+                let initial_structure = match Structure::try_from(initial_reference) {
+                    Ok(structure) => structure,
+                    Err(error) => {
+                        return Err(error);
                     }
+                };
 
-                    Some(entity)
-                } else {
-                    None
-                }
+                // Spawn the initial structure
+                spawn_structure_by_data(
+                    commands,
+                    asset_server,
+                    &initial_structure,
+                    combined_transform,
+                    struct_stack,
+                    gen_rng,
+                    dir_light_writer,
+                    amb_light_writer,
+                    fog_writer,
+                    music_writer,
+                    sfx_writer,
+                    selective_replacement_writer,
+                    Some(entity),
+                )?;
+
+                // Send the SelectiveReplacementEvent
+                selective_replacement_writer.send(SelectiveReplacementEvent::Replace {
+                    entity: child,
+                    replacement_reference: replacement_reference.clone(),
+                    tags: tags.clone(),
+                    replace_count: *replace_count,
+                });
+
+                Some(entity)
             }
         };
 

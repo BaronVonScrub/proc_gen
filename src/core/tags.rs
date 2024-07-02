@@ -1,5 +1,4 @@
 use bevy::prelude::*;
-use serde::{Serialize, Deserialize};
 use bevy_inspector_egui::prelude::*;
 use std::slice::Iter;
 
