@@ -539,7 +539,7 @@ pub(crate) fn spawn_structure_by_data(
                     replace_count: *replace_count,
                 });
 
-                Some(entity)
+                Some(child)
             }
         };
 
