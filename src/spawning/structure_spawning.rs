@@ -513,7 +513,7 @@ pub(crate) fn spawn_structure_by_data(
                 };
 
                 // Spawn the initial structure
-                spawn_structure_by_data(
+                let child_ent = spawn_structure_by_data(
                     commands,
                     asset_server,
                     &initial_structure,
@@ -527,17 +527,17 @@ pub(crate) fn spawn_structure_by_data(
                     sfx_writer,
                     selective_replacement_writer,
                     parent
-                )?
+                )?;
 
                 // Send the SelectiveReplacementEvent
-                /*selective_replacement_writer.send(SelectiveReplacementEvent::Replace {
-                    entity: entity,
+                selective_replacement_writer.send(SelectiveReplacementEvent::Replace {
+                    entity: child_ent.unwrap(),
                     replacement_reference: replacement_reference.clone(),
                     tags: tags.clone(),
                     replace_count: *replace_count,
                 });
 
-                Some(child)*/
+                child_ent
             }
         };
 
