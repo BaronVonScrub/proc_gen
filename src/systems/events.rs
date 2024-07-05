@@ -2,7 +2,7 @@ use crate::spawning::mesh_spawning::spawn_mesh;
 use bevy::prelude::*;
 use bevy_kira_audio::{Audio, AudioChannel, AudioControl};
 use bevy_kira_audio::prelude::AudioEmitter;
-use rand_core::RngCore;
+use rand::prelude::IteratorRandom;
 use crate::spawning::structure_spawning::spawn_structure_by_name;
 use crate::spawning::scene_spawning::spawn_scene_from_path;
 use crate::core::structure_key::StructureKey;
@@ -263,8 +263,10 @@ pub fn selective_replacement_reader_system(
                         .collect();
 
 
+                    let random_entities = descendant_entities.into_iter().choose_multiple(&mut gen_rng.rng_mut(), *replace_count);
+
                     // Process the filtered descendant entities
-                    for (descendant, transform) in descendant_entities.iter().shuffle(gen_rng.rng_mut().next_u32()).take(*replace_count) {
+                    for (descendant, transform) in random_entities.iter().take(*replace_count) {
                         // Get the parent entity
                         let parent_entity = parent_query.get(*descendant).ok().map(|parent| parent.get());
 
