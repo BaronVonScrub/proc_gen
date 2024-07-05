@@ -232,7 +232,7 @@ pub fn selective_replacement_reader_system(
     mut spawn_writer: EventWriter<ObjectSpawnEvent>,
     parent_query: Query<&Parent>,
     mut query: Query<(Entity, &Tags, &Transform)>,
-    gen_rng: &mut ResMut<GenRng>,
+    mut gen_rng: ResMut<GenRng>,
 ) {
     for event in replacement_reader.read() {
         match event {
