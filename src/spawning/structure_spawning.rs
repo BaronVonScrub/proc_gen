@@ -505,8 +505,6 @@ pub(crate) fn spawn_structure_by_data(
                 )?
             }
             StructureKey::SelectiveReplacement { initial_reference, replacement_reference, tags, replace_count } => {
-                let child = commands.spawn(PbrBundle { ..default() }).id();
-
                 let initial_structure = match Structure::try_from(initial_reference) {
                     Ok(structure) => structure,
                     Err(error) => {
@@ -529,17 +527,17 @@ pub(crate) fn spawn_structure_by_data(
                     sfx_writer,
                     selective_replacement_writer,
                     parent
-                )?;
+                )?
 
                 // Send the SelectiveReplacementEvent
-                selective_replacement_writer.send(SelectiveReplacementEvent::Replace {
-                    entity: child,
+                /*selective_replacement_writer.send(SelectiveReplacementEvent::Replace {
+                    entity: entity,
                     replacement_reference: replacement_reference.clone(),
                     tags: tags.clone(),
                     replace_count: *replace_count,
                 });
 
-                Some(child)
+                Some(child)*/
             }
         };
 
