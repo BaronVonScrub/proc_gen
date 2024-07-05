@@ -528,7 +528,7 @@ pub(crate) fn spawn_structure_by_data(
                     music_writer,
                     sfx_writer,
                     selective_replacement_writer,
-                    Some(entity),
+                    parent
                 )?;
 
                 // Send the SelectiveReplacementEvent
