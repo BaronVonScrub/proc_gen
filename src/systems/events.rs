@@ -225,7 +225,7 @@ pub fn background_music_updater_system(
 pub fn selective_replacement_reader_system(
     mut commands: Commands,
     mut replacement_reader: EventReader<SelectiveReplacementEvent>,
-    //mut spawn_writer: EventWriter<ObjectSpawnEvent>,
+    mut spawn_writer: EventWriter<ObjectSpawnEvent>,
     parent_query: Query<&Parent>,
     mut query: Query<(Entity, &Tags)>,
 ) {
@@ -238,7 +238,7 @@ pub fn selective_replacement_reader_system(
                 replace_count,
             } => {
                 // Ensure only StructureReference::Ref is accepted
-                if let StructureReference::Ref { .. } = replacement_reference {
+                if let StructureReference::Ref { structure,.. } = replacement_reference {
                     // Find entities with matching tags
                     let matching_entities: Vec<Entity> = query
                         .iter_mut()
@@ -262,6 +262,13 @@ pub fn selective_replacement_reader_system(
                         // Example: Despawn the entity and send a spawn event
                         commands.entity(*descendant).despawn_recursive();
                     }
+
+                    spawn_writer.send(
+                        ObjectSpawnEvent::StructureSpawn{
+                            structure: structure.clone(),
+                            transform: Default::default(),
+                        }
+                    );
                 }
             }
         }
