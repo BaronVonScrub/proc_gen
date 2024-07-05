@@ -21,14 +21,17 @@ pub enum ObjectSpawnEvent {
         mesh: Mesh,
         transform: EulerTransform,
         material: TMaterial,
+        parent: Option<Entity>,
     },
     SceneSpawn {
         data: StructureKey,
         transform: EulerTransform,
+        parent: Option<Entity>,
     },
     StructureSpawn {
         structure: String,
         transform: EulerTransform,
+        parent: Option<Entity>,
     }
 }
 
@@ -95,7 +98,7 @@ pub fn object_spawn_reader_system(
 ) {
     for spawn_event in spawn_reader.read() {
         match spawn_event {
-            ObjectSpawnEvent::MeshSpawn { mesh, transform, material } => {
+            ObjectSpawnEvent::MeshSpawn { mesh, transform, material, .. } => {
                 spawn_mesh(
                     &mut commands,
                     &material_cache,
@@ -105,7 +108,7 @@ pub fn object_spawn_reader_system(
                     &material
                 );
             },
-            ObjectSpawnEvent::SceneSpawn { data, transform } => {
+            ObjectSpawnEvent::SceneSpawn { data, transform, .. } => {
                 spawn_scene_from_path(
                     &mut commands,
                     &asset_server,
@@ -114,7 +117,7 @@ pub fn object_spawn_reader_system(
                     Transform::IDENTITY
                 );
             },
-            ObjectSpawnEvent::StructureSpawn { structure, transform } => {
+            ObjectSpawnEvent::StructureSpawn { structure, transform, parent } => {
                 match spawn_structure_by_name(
                     &mut commands,
                     &asset_server,
@@ -128,7 +131,7 @@ pub fn object_spawn_reader_system(
                     &mut music_writer,
                     &mut sfx_writer,
                     &mut selective_replacement_writer,
-                    None
+                    *parent
                 ) {
                     Ok(_) => {},
                     Err(error) => {
@@ -227,7 +230,7 @@ pub fn selective_replacement_reader_system(
     mut replacement_reader: EventReader<SelectiveReplacementEvent>,
     mut spawn_writer: EventWriter<ObjectSpawnEvent>,
     parent_query: Query<&Parent>,
-    mut query: Query<(Entity, &Tags)>,
+    mut query: Query<(Entity, &Tags, &Transform)>,
 ) {
     for event in replacement_reader.read() {
         match event {
@@ -240,11 +243,11 @@ pub fn selective_replacement_reader_system(
                 // Ensure only StructureReference::Ref is accepted
                 if let StructureReference::Ref { structure,.. } = replacement_reference {
                     // Find entities with matching tags
-                    let matching_entities: Vec<Entity> = query
+                    let matching_entities: Vec<(Entity, &Transform)> = query
                         .iter_mut()
-                        .filter_map(|(entity, entity_tags)| {
+                        .filter_map(|(entity, entity_tags, transform)| {
                             if entity_tags.0.iter().any(|tag| tags.contains(tag)) {
-                                Some(entity)
+                                Some((entity, transform))
                             } else {
                                 None
                             }
@@ -252,28 +255,33 @@ pub fn selective_replacement_reader_system(
                         .collect();
 
                     // Filter out all those that are NOT descendants of the entity listed in the Replace enum
-                    let descendant_entities: Vec<Entity> = matching_entities
+                    let descendant_entities: Vec<(Entity, &Transform)> = matching_entities
                         .into_iter()
-                        .filter(|&e| is_descendant(entity, e, &parent_query))
+                        .filter(|&(e, _)| is_descendant(entity, e, &parent_query))
                         .collect();
 
                     // Process the filtered descendant entities
-                    for descendant in descendant_entities.iter().take(*replace_count) {
-                        // Example: Despawn the entity and send a spawn event
-                        commands.entity(*descendant).despawn_recursive();
-                    }
+                    for (descendant, transform) in descendant_entities.iter().take(*replace_count) {
+                        // Get the parent entity
+                        let parent_entity = parent_query.get(*descendant).ok().map(|parent| parent.get());
 
-                    spawn_writer.send(
-                        ObjectSpawnEvent::StructureSpawn{
-                            structure: structure.clone(),
-                            transform: Default::default(),
-                        }
-                    );
+                        // Despawn the entity and send a spawn event
+                        commands.entity(*descendant).despawn_recursive();
+
+                        spawn_writer.send(
+                            ObjectSpawnEvent::StructureSpawn {
+                                structure: structure.clone(),
+                                transform: (*(*transform)).into(),
+                                parent: parent_entity,
+                            }
+                        );
+                    }
                 }
             }
         }
     }
 }
+
 
 fn is_descendant(ancestor: &Entity, child: Entity, parent_query: &Query<&Parent>) -> bool {
     let mut current_entity = child;
