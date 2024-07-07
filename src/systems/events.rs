@@ -270,6 +270,15 @@ pub fn selective_replacement_reader_system(
                         // Get the parent entity
                         let parent_entity = parent_query.get(*descendant).ok().map(|parent| parent.get());
 
+                        // Debug logging to check transform values
+                        println!("Despawning entity: {:?}", descendant);
+                        println!("Original transform: {:?}", transform);
+                        if let Some(parent) = parent_entity {
+                            println!("Parent entity: {:?}", parent);
+                        } else {
+                            println!("No parent entity found.");
+                        }
+
                         // Despawn the entity and send a spawn event
                         commands.entity(*descendant).despawn_recursive();
 
