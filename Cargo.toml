@@ -79,3 +79,6 @@ path = "src/lib.rs"
 
 [features]
 test = []
+
+[workspace]
+members = ["tests"]

@@ -1,5 +1,4 @@
 use bevy::prelude::*;
-use bevy_asset_loader::prelude::*;
 use bevy_atmosphere::plugin::AtmospherePlugin;
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_kira_audio::{AudioApp, AudioPlugin};
@@ -66,7 +65,7 @@ fn main() {
     // Setup skybox (atmosphere)
     app.add_plugins(AtmospherePlugin);
 
-    app.add_systems(OnEnter(proc_gen::management::material_autoloader::GameState::Playing), generation::generate_map);
+    app.add_systems(OnEnter(proc_gen::management::material_autoloader::GameState::Playing), (ingame_setup,generation::generate_map).chain());
 
     // Setup events
     app.add_event::<ObjectSpawnEvent>()

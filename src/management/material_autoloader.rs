@@ -20,8 +20,8 @@ pub struct MaterialTextures {
 #[derive(Clone, Eq, PartialEq, Debug, Hash, Default, States)]
 pub enum GameState {
     #[default]
-    Loading,  // 📌 Asset loading happens in this state
-    Playing,  // 📌 Switch here when done
+    Loading,
+    Playing,
 }
 
 impl Plugin for MaterialAutoloader {
@@ -33,7 +33,8 @@ impl Plugin for MaterialAutoloader {
                     .load_collection::<MaterialTextures>(), // ✅ Load textures!
             )
             .add_systems(OnEnter(GameState::Playing), preload_materials_system) // ✅ Convert textures into materials
-            .add_systems(OnEnter(GameState::Playing), check_loaded_assets); // ✅ Debug check
+            //.add_systems(OnEnter(GameState::Playing), check_loaded_assets)
+            ; // ✅ Debug check
     }
 }
 

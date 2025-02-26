@@ -17,6 +17,7 @@ impl Plugin for InputPlugin {
 pub enum MouseButtonState {
     #[default]
     Unheld,
+    #[allow(unused)]
     Held(Vec2),
 }
 
