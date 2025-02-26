@@ -8,11 +8,11 @@ use image::GenericImageView;
 fn main() {
     generate_metallic_roughness_maps();
     generate_texture_meta_files();
-    generate_ui_sprites();
+    //generate_ui_sprites();
     generate_ui_meta_files();
 }
 
-fn generate_ui_sprites() {
+/*fn generate_ui_sprites() {
     let sprites_path = Path::new("assets/ui");
     let dest_path = sprites_path.join("ui_sprite_names.rs");
     let entries = fs::read_dir(sprites_path).unwrap_or_else(|_| {
@@ -31,7 +31,7 @@ fn generate_ui_sprites() {
 
     let sprite_names_array = format!("#[allow(dead_code)]\npub const UI_SPRITE_NAMES: &[&str] = &{:?};", sprite_names);
     write(&dest_path, sprite_names_array).unwrap();
-}
+}*/
 
 fn generate_ui_meta_files() {
     let ui_sprites_path = Path::new("assets/ui");

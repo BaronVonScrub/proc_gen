@@ -60,15 +60,14 @@ pub(crate) fn initialize_camera_system(
         .id();
 
     // Spawn the CameraFocus entity as a child of the CameraSystem entity
-    commands.spawn((
-        TransformBundle {
-            local: focus_trans,
-            global: Default::default(),
-        },
-        Name::new("CameraFocus"),
-    ))
+    commands.spawn(TransformBundle {
+        local: focus_trans,
+        global: Default::default(),
+    })
+        .insert(Name::new("CameraFocus"))
         .insert(CameraFocus)
         .set_parent(camera_system_entity);
+
 
     // Spawn the MainCamera entity as a child of the CameraSystem entity
     commands.spawn(Camera3dBundle {
