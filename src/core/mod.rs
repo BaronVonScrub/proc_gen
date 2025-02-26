@@ -11,3 +11,4 @@ pub mod tags;
 pub mod structure_error;
 pub mod tmaterial;
 pub mod components;
+pub mod generator_plugin;

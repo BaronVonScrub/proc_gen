@@ -1,0 +1,14 @@
+(
+    structure_name: "Empty Quadrant",
+    tags: [],
+    data: [
+        (Nest(Ref(
+            structure: "Castle/WallParts/wall_corner",
+            ownership: Inherit,
+        )), (
+        translation: (2.0, 0.0, 0.0),
+        rotation: (0.0, 0.0, 0.0),
+        scale: (1.0, 1.0, 1.0),
+        )),
+    ],
+)

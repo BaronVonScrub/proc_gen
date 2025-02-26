@@ -1,0 +1,46 @@
+(
+    structure_name: "Dead End",
+    tags: [],
+    data: [
+        (Nest(Ref(
+            structure: "Castle/WallParts/wall_model",
+            ownership: Inherit,
+        )), (
+            translation: (-2.0, 0.0, 1.0),
+            rotation: (0.0, 90.0, 0.0),
+            scale: (1.0, 1.0, 1.0),
+        )),
+        (Nest(Ref(
+            structure: "Castle/WallParts/wall_corner_model",
+            ownership: Inherit,
+        )), (
+            translation: (-3.25, 0.0, 1.25),
+            rotation: (0.0, 180.0, 0.0),
+            scale: (1.0, 1.0, 1.0),
+        )),
+        (Nest(Ref(
+            structure: "Castle/WallParts/wall_model",
+            ownership: Inherit,
+        )), (
+            translation: (-3.0, 0.0, 0.0),
+            rotation: (0.0, 0.0, 0.0),
+            scale: (1.0, 1.0, 1.0),
+        )),
+        (Nest(Ref(
+            structure: "Castle/WallParts/wall_corner_model",
+            ownership: Inherit,
+        )), (
+            translation: (-3.25, 0.0, -1.25),
+            rotation: (0.0, 90, 0.0),
+            scale: (1.0, 1.0, 1.0),
+        )),
+        (Nest(Ref(
+            structure: "Castle/WallParts/wall_model",
+            ownership: Inherit,
+        )), (
+            translation: (-2.0, 0.0, -1.0),
+            rotation: (0.0, 270.0, 0.0),
+            scale: (1.0, 1.0, 1.0),
+        )),
+    ],
+)

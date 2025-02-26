@@ -1,0 +1,22 @@
+(
+    structure_name: "Castle Core",
+    tags: [],
+    data: [
+        (NestingLoop(
+            reference: Ref(
+                structure: "Castle/Sectors/sector",
+                ownership: Inherit,
+            ),
+            repeated_transform: (
+                translation: (2.0, 0.0, 0.0),
+                rotation: (0.0, 90.0, 0.0),
+                scale: (1.0, 1.0, 1.0),
+            ),
+            count: 4),
+        (
+            translation: (-1.0, 0.0, 1.0),
+            rotation: (0.0, 0.0, 0.0),
+            scale: (1.0, 1.0, 1.0),
+        ))
+    ],
+)

@@ -6,6 +6,7 @@ edition = "2021"
 description = "Procedural generation library"
 license = "MIT"
 repository = "https://github.com/BaronVonScrub/proc_gen"
+exclude = ["tests/**"]
 
 [dependencies]
 
@@ -32,11 +33,12 @@ bevy = { version = "0.13", default-features = false, features = [
     "webgl2",
     "bevy_debug_stepping",
     "asset_processor",
+    "embedded_watcher",
     "file_watcher",
     "basis-universal",
     "serialize"
 ] }
-bevy_kira_audio = { version = "0.19", features = ["mp3"] }
+bevy_kira_audio = { version = "0.19", default-features = false, features = ["mp3"] }
 image = "0.25.1"
 glob = "0.3.1"
 bevy-inspector-egui = "0.24.0"
@@ -75,6 +77,5 @@ bevy_rapier3d = { git = "https://github.com/dimforge/bevy_rapier", rev = "0110ee
 name = "proc_gen"
 path = "src/lib.rs"
 
-[[bin]]
-name = "dummy"
-path = "src/dummy.rs"
+[features]
+test = []

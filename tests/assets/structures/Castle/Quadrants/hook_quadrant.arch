@@ -1,0 +1,35 @@
+(
+    structure_name: "Hook Quadrant",
+    tags: [],
+    data: [
+        (Choose(list: Raw(
+            structure: (
+                structure_name: "Hook Quadrant Choose",
+                tags: [],
+                data: [
+                    (Nest(Ref(
+                        structure: "Castle/Quadrants/hook_quadrant_a",
+                        ownership: Inherit,
+                    )), (
+                        translation: (0.0, 0.0, 0.0),
+                        rotation: (0.0, 0.0, 0.0),
+                        scale: (1.0, 1.0, 1.0),
+                    )),
+                    (Nest(Ref(
+                        structure: "Castle/Quadrants/hook_quadrant_b",
+                        ownership: Inherit,
+                    )), (
+                        translation: (0.0, 0.0, 0.0),
+                        rotation: (0.0, 0.0, 0.0),
+                        scale: (1.0, 1.0, 1.0),
+                    )),
+                ],
+            ),
+            ownership: Inherit,
+        )), (
+            translation: (0.0, 0.0, 0.0),
+            rotation: (0.0, 0.0, 0.0),
+            scale: (1.0, 1.0, 1.0),
+        ))
+    ],
+)

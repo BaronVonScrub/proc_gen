@@ -1,0 +1,58 @@
+(
+    structure_name: "Atmospheric Setup",
+    tags: [],
+    data: [
+        (DirectionalLight((
+            color: Rgba(
+                red: 1.0,
+                green: 1.0,
+                blue: 0.91,
+                alpha: 1.0,
+            ),
+            illuminance: 30000.0,
+            shadows_enabled: true,
+            shadow_depth_bias: 0.02,
+            shadow_normal_bias: 1.8,
+        )), (
+            translation: (0.0, 0.0, 0.0),
+            rotation: (-114.59, 30.0, 0.0),
+            scale: (1.0, 1.0, 1.0),
+        )),
+        (AmbientLight((
+            color: Rgba(
+                red: 1.0,
+                green: 1.0,
+                blue: 1.0,
+                alpha: 1.0,
+            ),
+            brightness: 350.0,
+        )), (
+            translation: (0.0, 0.0, 0.0),
+            rotation: (0.0, 0.0, 0.0),
+            scale: (1.0, 1.0, 1.0),
+        )),
+        (FogSettings((
+            color: Rgba(
+                red: 0.83,
+                green: 0.9,
+                blue: 1.0,
+                alpha: 0.8,
+            ),
+            falloff: Atmospheric(
+                extinction: Vec3(0.015,0.015,0.015),
+                inscattering: Vec3(0.002,0.002,0.002)
+            ),
+            directional_light_color: Rgba(
+            red: 1.0,
+            green: 1.0,
+            blue: 0.91,
+            alpha: 1.0,
+        ),
+            directional_light_exponent: 30.0,
+        )), (
+            translation: (0.0, 0.0, 0.0),
+            rotation: (0.0, 0.0, 0.0),
+            scale: (1.0, 1.0, 1.0),
+        ))
+    ],
+)

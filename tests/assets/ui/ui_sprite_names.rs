@@ -1,0 +1,2 @@
+#[allow(dead_code)]
+pub const UI_SPRITE_NAMES: &[&str] = &["button1.png", "button2.png", "button3.png", "tile_0052.png", "tile_0053.png", "tile_0054.png", "tile_0055.png", "tile_0056.png", "tile_0057.png", "tile_0058.png", "tile_0059.png", "tile_0060.png", "tile_0061.png", "tile_0062.png", "tile_0063.png", "tile_0064.png"];

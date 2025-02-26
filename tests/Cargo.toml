@@ -1,0 +1,25 @@
+[package]
+name = "crate_testing"
+version = "0.1.0"
+edition = "2021"
+build = "build.rs"
+
+[dependencies]
+bevy = "0.13.2"
+bevy_kira_audio = { version = "0.19", default-features = false, features = ["mp3"] }
+bevy-inspector-egui = "0.24.0"
+bevy_atmosphere = "0.9.1"
+bevy_math = "0.13.2"
+bevy_utils = "0.13.2"
+bevy_pbr = "0.13.2"
+bevy_asset_loader = "0.20.1"
+
+[build-dependencies]
+image = "0.25.1"
+
+[features]
+test = []
+
+[[bin]]
+name = "main"
+path = "src/main.rs"

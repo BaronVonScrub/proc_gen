@@ -40,7 +40,7 @@ pub(crate) fn spawn_structure_by_name(
     struct_stack.push(structure_name.clone());
 
     let formatted_name = format!("{:?}", structure_name.clone());
-    let ent = commands.spawn(PbrBundle { ..default() })
+    let ent = commands.spawn(PbrBundle{ ..default() })
         .insert(Name::new(formatted_name))
         .id();
 
@@ -161,7 +161,7 @@ pub(crate) fn spawn_structure_by_data(
                         parent
                     )?
                 } else {
-                    Some(commands.spawn(()).insert(Name::new("Probabalistically Rejected")).id())
+                    Some(commands.spawn(Name::new("Probabilistically Rejected")).id())
                 }
             }
             StructureKey::Choose { list } => {
@@ -268,13 +268,12 @@ pub(crate) fn spawn_structure_by_data(
                 None
             }
             StructureKey::SoundEffect(filepath) => {
-                let ent = commands.spawn((
-                    TransformBundle {
-                        local: combined_transform,
-                        global: Default::default(),
-                    },
-                    Name::new(format!("AudioEmitter: {:?}", filepath)),
-                )).id();
+                let ent = commands.spawn(TransformBundle {
+                    local: combined_transform,
+                    global: Default::default(),
+                })
+                    .insert(Name::new(format!("AudioEmitter: {:?}", filepath)))
+                    .id();
 
                 sfx_writer.send(SFXEvent::CreateAudioEmitter {
                     filepath: filepath.clone(),
@@ -411,7 +410,7 @@ pub(crate) fn spawn_structure_by_data(
                 )?
             }
             StructureKey::Reflection { reference, reflection_plane, reflection_point, reflect_child } => {
-                let child = commands.spawn(PbrBundle { ..default() }).id();
+                let child = commands.spawn(PbrBundle{ ..default() }).id();
 
                 if *reflect_child {
                     return Err("Child reflection not implemented!".into());

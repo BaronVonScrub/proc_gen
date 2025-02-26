@@ -16,7 +16,23 @@ pub fn import_structure(structure_name: String) -> Result<Structure, ron::Error>
         return Ok(cached_structure.clone());
     }
 
-    let file_path = format!("assets/structures/{}.arch", structure_name);
+    // 🔥 NEW: Get the folder where Cargo.toml is running from
+    let base_path = std::env::current_dir().unwrap();
+
+    // 🔥 NEW: Make the path relative to the Cargo.toml location
+    let file_path = base_path
+        .join("assets/structures") // RELATIVE to Cargo.toml, wherever it is!
+        .join(format!("{}.arch", structure_name));
+
+    // Check if file exists before opening
+    if !file_path.exists() {
+        eprintln!("❌ ERROR: Structure file NOT FOUND: {:?}", file_path);
+        return Err(ron::Error::Message(format!(
+            "File not found: {:?}",
+            file_path
+        )));
+    }
+
     let file = File::open(&file_path)?;
     let deserialized: Result<Structure, SpannedError> = from_reader(file);
 

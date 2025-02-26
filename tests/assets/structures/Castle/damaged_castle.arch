@@ -1,0 +1,22 @@
+(
+    structure_name: "Castle",
+    tags: [],
+    data: [
+        (SelectiveReplacement(
+            initial_reference: Ref(
+                structure: "Castle/castle",
+                ownership: Team(1),
+            ),
+            replacement_reference: Ref(
+                structure: "test_unit",
+                ownership: Team(1),
+            ),
+            tags: ["Test"],
+            replace_count: 4),
+        (
+            translation: (-1.0, 0.0, 1.0),
+            rotation: (0.0, 0.0, 0.0),
+            scale: (1.0, 1.0, 1.0),
+        ))
+    ],
+)

@@ -1,0 +1,30 @@
+(
+    structure_name: "Knife Quadrant B",
+    tags: [],
+    data: [
+        (Nest(Ref(
+            structure: "Castle/Sectors/sector",
+            ownership: Inherit,
+        )), (
+            translation: (0.0, 0.0, 2.0),
+            rotation: (0.0, 0.0, 0.0),
+            scale: (1.0, 1.0, 1.0),
+        )),
+        (Nest(Ref(
+            structure: "Castle/WallParts/dead_end",
+            ownership: Inherit,
+        )), (
+            translation: (0.0, 0.0, 0.0),
+            rotation: (0.0, 90.0, 0.0),
+            scale: (1.0, 1.0, 1.0),
+        )),
+        (Nest(Ref(
+            structure: "Castle/WallParts/wall_model",
+            ownership: Inherit,
+        )), (
+            translation: (-1.0, 0.0, 0.0),
+            rotation: (0.0, 0.0, 0.0),
+            scale: (1.0, 1.0, 1.0),
+        )),
+    ],
+)
