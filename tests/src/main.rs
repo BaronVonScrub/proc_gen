@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use bevy_atmosphere::plugin::AtmospherePlugin;
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
-use bevy_kira_audio::{AudioApp, AudioPlugin};
+use bevy_kira_audio::{AudioApp, AudioPlugin, SpatialAudioPlugin};
 use bevy_pbr::CascadeShadowConfig;
 use proc_gen::core::components::MainDirectionalLight;
 use proc_gen::core::generator_plugin::GeneratorPlugin;
@@ -36,7 +36,7 @@ fn main() {
                     title: "Proc Gen Testing".into(),
                     resolution: (1024.0, 768.0).into(),
                     resizable: false,
-                    mode: bevy::window::WindowMode::BorderlessFullscreen,
+                    mode: bevy::window::WindowMode::BorderlessFullscreen(MonitorSelection::Primary),
                     ..default()
                 }),
                 ..default()
@@ -50,7 +50,7 @@ fn main() {
 
     // Setup world (resources, types)
     app.insert_resource(AmbientLight {
-        color: Color::rgba(154.0 / 255.0, 166.0 / 255.0, 254.0 / 255.0, 1.0),
+        color: Color::srgba(154.0 / 255.0, 166.0 / 255.0, 254.0 / 255.0, 1.0),
         brightness: 75.0,
     });
 
@@ -87,9 +87,11 @@ fn main() {
 
     // Setup audio: add the audio plugin, an audio channel, and spacial audio resource
     app.add_plugins(AudioPlugin)
-        .add_audio_channel::<proc_gen::management::audio_management::SoundEffects>()
+        .add_audio_channel::<proc_gen::management::audio_management::SoundEffects>();
+
+    app.add_plugins(SpatialAudioPlugin);
         //.add_systems(Startup, audio_manager::start_background_audio)
-        .insert_resource(bevy_kira_audio::prelude::SpacialAudio { max_distance: 25. });
+
 
     // Setup physics
     //app.add_plugins(RapierPhysicsPlugin::<NoUserData>::default());
@@ -112,21 +114,20 @@ fn ingame_setup(
         substeps: 10,
     };*/
 
-    commands.spawn(DirectionalLightBundle {
-        directional_light: DirectionalLight {
+    commands.spawn_empty()
+        .insert( DirectionalLight {
             shadows_enabled: true,
             illuminance: 30000.0,
-            color: Color::rgba(171.0 / 255.0, 183.0 / 255.0, 255.0 / 255.0, 1.0),
+            color: Color::srgba(171.0 / 255.0, 183.0 / 255.0, 255.0 / 255.0, 1.0),
             ..default()
-        },
-        transform: Transform::from_rotation(
-            Quat::from_euler(EulerRot::XYZ,0.0,3.1,-6.3)),
-        cascade_shadow_config: CascadeShadowConfig {
+        })
+        .insert(Transform::from_rotation(
+            Quat::from_euler(EulerRot::XYZ,0.0,3.1,-6.3)))
+        .insert(CascadeShadowConfig {
             bounds: vec![0.0, 30.0, 90.0, 270.0],
             overlap_proportion: 0.2,
-            minimum_distance: 0.0,
-        },
-        ..default()
-    })
+            minimum_distance: 0.0
+        })
+        .insert(InheritedVisibility::default())
         .insert(MainDirectionalLight);
 }

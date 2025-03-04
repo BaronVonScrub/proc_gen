@@ -4,6 +4,10 @@ use bevy::{
     pbr::StandardMaterial,
     utils::hashbrown::HashMap,
 };
+use bevy::asset::processor::LoadTransformAndSave;
+use bevy::asset::transformer::IdentityAssetTransformer;
+use bevy::image::ImageLoader;
+use bevy::image::CompressedImageSaver;
 use bevy_asset_loader::prelude::*;
 use crate::serialization::caching::MaterialCache;
 
@@ -26,6 +30,14 @@ pub enum GameState {
 
 impl Plugin for MaterialAutoloader {
     fn build(&self, app: &mut App) {
+
+        app.register_asset_processor::<LoadTransformAndSave<ImageLoader, IdentityAssetTransformer<_>, CompressedImageSaver>>
+            (LoadTransformAndSave::from(CompressedImageSaver));
+
+        app.set_default_asset_processor::<LoadTransformAndSave<ImageLoader, IdentityAssetTransformer<_>, CompressedImageSaver>>(
+            ".png",
+        );
+
         app.init_state::<GameState>() // ✅ Initialize game state
             .add_loading_state(
                 LoadingState::new(GameState::Loading) // ✅ Load assets in this state
@@ -33,7 +45,7 @@ impl Plugin for MaterialAutoloader {
                     .load_collection::<MaterialTextures>(), // ✅ Load textures!
             )
             .add_systems(OnEnter(GameState::Playing), preload_materials_system) // ✅ Convert textures into materials
-            //.add_systems(OnEnter(GameState::Playing), check_loaded_assets)
+            //.add_systems(OnEnter(GameState::Playing), check_l oaded_assets)
             ; // ✅ Debug check
     }
 }
@@ -87,15 +99,6 @@ fn preload_materials_system(
     }
 
     commands.insert_resource(material_cache);
-}
-
-// 🚀 Step 3: Verify Loaded Assets
-fn check_loaded_assets(material_textures: Res<MaterialTextures>) {
-    println!("🔍 MaterialTextures loaded! Found {} textures.", material_textures.textures.len());
-
-    for (name, _handle) in &material_textures.textures {
-        println!("✅ Loaded texture: {}", name);
-    }
 }
 
 // 🚀 Utility: Extract Material Data

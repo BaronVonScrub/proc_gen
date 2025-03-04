@@ -4,9 +4,8 @@ use bevy_rapier3d::prelude::*;
 use crate::core::collider::ColliderType;
 use crate::core::rand_data::RandData;
 use statrs::distribution::{Normal};
-use rand::Rng;
+use rand::{Rng, SeedableRng};
 use rand::distributions::Distribution;
-use rand_core::SeedableRng;
 use crate::spawning::euler_transform::EulerTransform;
 
 pub fn reflect_point(

@@ -14,20 +14,19 @@ pub(crate) fn spawn_scene_from_path(
     global_transform: Transform,
     local_transform: Transform
 ) -> Entity {
-    let parent_entity = commands.spawn(SpatialBundle {
-        transform: global_transform * local_transform,
-        ..Default::default()
-    }).id();
+    let parent_entity = commands.spawn_empty()
+        .insert(global_transform * local_transform)
+        .insert(InheritedVisibility::default())
+        .id();
 
     if let StructureKey::Object { path, collider, offset, ownership, selectable, object_type } = model_data {
         let scene_handle: Handle<Scene> = asset_server.load(path);
 
         commands.entity(parent_entity).with_children(|parent| {
-            parent.spawn(SceneBundle {
-                scene: scene_handle,
-                transform: Transform::from_translation(*offset),
-                ..Default::default()
-            });
+            parent.spawn_empty()
+                .insert(InheritedVisibility::default())
+                .insert(SceneRoot(scene_handle))
+                .insert(Transform::from_translation(*offset));
         });
 
         let filename = Path::new(path)

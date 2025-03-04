@@ -2,7 +2,7 @@ use bevy::app::{App, Plugin};
 use bevy::input::mouse::{ MouseWheel};
 use bevy::prelude::*;
 use bevy_atmosphere::plugin::AtmosphereCamera;
-use bevy_kira_audio::prelude::AudioReceiver;
+use bevy_kira_audio::SpatialAudioReceiver;
 use crate::input_manager::{InputStates, MouseButtonState};
 use proc_gen::core::components::MainCamera;
 
@@ -50,44 +50,39 @@ pub(crate) fn initialize_camera_system(
     cam_trans.look_at(focus_trans.translation, Vec3::Y);
 
     // Spawn the parent entity named "CameraSystem" with the tag component
-    let camera_system_entity = commands.spawn(
-        SpatialBundle {
-            transform: focus_trans,
-            ..default()
-        })
+    let camera_system_entity = commands.spawn_empty()
+        .insert(focus_trans)
         .insert(Name::new("CameraSystem"))
         .insert(CameraSystem)
+        .insert(InheritedVisibility::default())
         .id();
 
     // Spawn the CameraFocus entity as a child of the CameraSystem entity
-    commands.spawn(TransformBundle {
-        local: focus_trans,
-        global: Default::default(),
-    })
+    commands.spawn_empty()
+        .insert(focus_trans)
         .insert(Name::new("CameraFocus"))
         .insert(CameraFocus)
         .set_parent(camera_system_entity);
 
 
     // Spawn the MainCamera entity as a child of the CameraSystem entity
-    commands.spawn(Camera3dBundle {
-        transform: cam_trans,
-        ..default()
-    })
+    commands.spawn_empty()
+        .insert(Camera3d::default())
+        .insert(cam_trans)
         .insert(AtmosphereCamera::default())
-        .insert(FogSettings {
-            color: Color::rgba(0.35, 0.48, 0.66, 1.0),
-            directional_light_color: Color::rgba(171.0 / 255.0, 183.0 / 255.0, 255.0 / 255.0, 1.0),
+        .insert(DistanceFog {
+            color: Color::srgba(0.35, 0.48, 0.66, 1.0),
+            directional_light_color: Color::srgba(171.0 / 255.0, 183.0 / 255.0, 255.0 / 255.0, 1.0),
             directional_light_exponent: 30.0,
             falloff: FogFalloff::from_visibility_colors(
                 20.0,
-                Color::rgb(0.1, 0.1, 0.1),
-                Color::rgb(0.5, 0.5, 0.5),
+                Color::srgb(0.1, 0.1, 0.1),
+                Color::srgb(0.5, 0.5, 0.5),
             ),
         })
         .insert(Name::new("MainCamera"))
         .insert(MainCamera)
-        .insert(AudioReceiver)
+        .insert(SpatialAudioReceiver)
         .set_parent(camera_system_entity);
 }
 
@@ -101,13 +96,11 @@ impl Default for ZoomParameters {
     fn default() -> Self {
         // Define your points for the spline
         let points = vec![
-            Vec2::new(0.0, 0.0),
             Vec2::new(3.0, 0.0),
             Vec2::new(30.0, 25.0),
             Vec2::new(0.1, 100.0),
-            Vec2::new(0.0, 100.0),
         ];
-        let curve = CubicCardinalSpline::new(0.5, points).to_curve();
+        let curve = CubicCardinalSpline::new(0.5, points).to_curve().unwrap();
 
         ZoomParameters {
             curve,

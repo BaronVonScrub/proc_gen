@@ -3,6 +3,7 @@ use bevy::prelude::*;
 use oxidized_navigation::NavMeshAffector;
 use crate::core::tmaterial::TMaterial;
 use crate::serialization::caching::MaterialCache;
+use bevy::render::mesh::MeshAabb;
 
 pub fn spawn_mesh(
     commands: &mut Commands,
@@ -33,17 +34,17 @@ pub fn spawn_mesh(
 
     if let Some(material_handle) = material_cache.get(&material_name) {
         let mesh_handle = meshes.add(adjusted_mesh);
-        commands.spawn(PbrBundle {
-            mesh: mesh_handle,
-            transform,
-            material: material_handle.clone(),
-            ..default()
-        })
+
+        commands.spawn_empty()
+            .insert(Mesh3d(mesh_handle))
+            .insert(MeshMaterial3d((*material_handle).clone()))
+            .insert(transform)
             .insert(Name::new("Floor"))
             .insert(Collider::cuboid(collider_size.x, collider_size.y, collider_size.z))
             .insert(RigidBody::KinematicPositionBased)
             .insert(ActiveEvents::CONTACT_FORCE_EVENTS)
-            .insert(NavMeshAffector);
+            .insert(NavMeshAffector)
+            .insert(InheritedVisibility::default());
     } else {
         println!("Material not found: {}", material_name);
     }

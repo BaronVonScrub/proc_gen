@@ -1,4 +1,4 @@
-use crate::serialization::serialization::SerializableFogSettings;
+use crate::serialization::serialization::SerializableDistanceFog;
 use crate::serialization::serialization::SerializableAmbientLight;
 use crate::serialization::serialization::SerializableDirectionalLight;
 use crate::serialization::serialization::SerializableSpotLight;
@@ -34,8 +34,8 @@ pub enum StructureKey {
     DirectionalLight(DirectionalLight),
     #[serde(with = "SerializableAmbientLight")]
     AmbientLight(AmbientLight),
-    #[serde(with = "SerializableFogSettings")]
-    FogSettings(FogSettings),
+    #[serde(with = "SerializableDistanceFog")]
+    DistanceFog(DistanceFog),
     BackgroundMusic(String),
     Nest(StructureReference),
     Choose {
@@ -120,7 +120,7 @@ impl StructureKey {
             },
             StructureKey::DirectionalLight { .. } => "DirectionalLight".to_string(),
             StructureKey::AmbientLight { .. } => "AmbientLight".to_string(),
-            StructureKey::FogSettings { .. } => "FogSettings".to_string(),
+            StructureKey::DistanceFog { .. } => "FogSettings".to_string(),
             StructureKey::BackgroundMusic { .. } => "BackgroundMusic".to_string(),
             StructureKey::SoundEffect { .. } => "SoundEffect".to_string(),
             StructureKey::SpotLight { .. } => "SpotLight".to_string(),

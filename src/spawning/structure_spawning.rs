@@ -40,19 +40,22 @@ pub(crate) fn spawn_structure_by_name(
     struct_stack.push(structure_name.clone());
 
     let formatted_name = format!("{:?}", structure_name.clone());
-    let ent = commands.spawn(PbrBundle{ ..default() })
+    let ent = commands.spawn_empty()
+        .insert(Transform::default())
         .insert(Name::new(formatted_name))
+        .insert(InheritedVisibility::default())
         .id();
 
     if let Some(parent) = parent {
-        commands.entity(parent).push_children(&[ent]);
+        commands.entity(parent).add_children(&[ent]);
     }
 
     let result = match import_structure(structure_name.clone()) {
         Ok(structure) => {
             let tags = Tags(structure.tags.clone());
             if tags.len() != 0 {
-                commands.entity(ent).insert(tags);
+                commands.entity(ent)
+                    .insert(tags);
             }
 
             spawn_structure_by_data(
@@ -81,7 +84,7 @@ pub(crate) fn spawn_structure_by_name(
     match result {
         Ok(child_maybe) => {
             if let Some(child) = child_maybe {
-                commands.entity(ent).push_children(&[child]);
+                commands.entity(ent).add_children(&[child]);
                 Ok(Some(child))
             } else {
                 Ok(None)
@@ -106,12 +109,14 @@ pub(crate) fn spawn_structure_by_data(
     selective_replacement_writer: &mut EventWriter<SelectiveReplacementEvent>,
     parent: Option<Entity>
 ) -> Result<Option<Entity>, StructureError> {
-    let entity = commands.spawn(PbrBundle { ..default() })
+    let entity = commands.spawn_empty()
         .insert(Name::new("Data"))
+        .insert(Transform::default())
+        .insert(InheritedVisibility::default())
         .id();
 
     if let Some(parent) = parent {
-        commands.entity(parent).push_children(&[entity]);
+        commands.entity(parent).add_children(&[entity]);
     }
 
     for (key, local_transform) in &structure.data {
@@ -255,7 +260,7 @@ pub(crate) fn spawn_structure_by_data(
                 });
                 None
             }
-            StructureKey::FogSettings(fog) => {
+            StructureKey::DistanceFog(fog) => {
                 fog_writer.send(FogEvent::SetFog {
                     fog: fog.clone(),
                 });
@@ -268,11 +273,10 @@ pub(crate) fn spawn_structure_by_data(
                 None
             }
             StructureKey::SoundEffect(filepath) => {
-                let ent = commands.spawn(TransformBundle {
-                    local: combined_transform,
-                    global: Default::default(),
-                })
+                let ent = commands.spawn_empty()
+                    .insert(combined_transform)
                     .insert(Name::new(format!("AudioEmitter: {:?}", filepath)))
+                    .insert(InheritedVisibility::default())
                     .id();
 
                 sfx_writer.send(SFXEvent::CreateAudioEmitter {
@@ -370,7 +374,7 @@ pub(crate) fn spawn_structure_by_data(
                 let curve = CubicCardinalSpline::new(*tension, points.clone()).to_curve();
                 let positions: Vec<Vec3> = match spread {
                     SpreadData::Regular => {
-                        curve.iter_positions(*count as usize).collect()
+                        curve.unwrap().iter_positions(*count as usize).collect()
                     },
                     _ => {
                         panic!("This spread type not supported yet!");
@@ -410,7 +414,11 @@ pub(crate) fn spawn_structure_by_data(
                 )?
             }
             StructureKey::Reflection { reference, reflection_plane, reflection_point, reflect_child } => {
-                let child = commands.spawn(PbrBundle{ ..default() }).id();
+                let child = commands.spawn_empty()
+                    .insert(Name::new("Child"))
+                    .insert(Transform::default())
+                    .insert(InheritedVisibility::default())
+                    .id();
 
                 if *reflect_child {
                     return Err("Child reflection not implemented!".into());
@@ -466,7 +474,7 @@ pub(crate) fn spawn_structure_by_data(
                     parent
                 )?;
 
-                commands.entity(child).push_children(&[reflect_a.unwrap(), reflect_b.unwrap()]);
+                commands.entity(child).add_children(&[reflect_a.unwrap(), reflect_b.unwrap()]);
 
                 Some(child)
             }
@@ -541,13 +549,14 @@ pub(crate) fn spawn_structure_by_data(
         };
 
         if let Some(child) = child_entity {
-            commands.entity(child).insert(Name::new(format!("{:?}", key.variant_name())));
+            commands.entity(child)
+                .insert(Name::new(format!("{:?}", key.variant_name())));
 
             if let Some(tags) = key.get_tags() {
                 commands.entity(child).insert(Tags(tags));
             }
 
-            commands.entity(entity).push_children(&[child]);
+            commands.entity(entity).add_children(&[child]);
         }
     }
 

@@ -1,7 +1,7 @@
 use crate::spawning::mesh_spawning::spawn_mesh;
 use bevy::prelude::*;
 use bevy_kira_audio::{Audio, AudioChannel, AudioControl};
-use bevy_kira_audio::prelude::AudioEmitter;
+use bevy_kira_audio::SpatialAudioEmitter;
 use rand::prelude::IteratorRandom;
 use crate::spawning::structure_spawning::spawn_structure_by_name;
 use crate::spawning::scene_spawning::spawn_scene_from_path;
@@ -39,7 +39,7 @@ pub enum ObjectSpawnEvent {
 #[derive(Event)]
 pub enum FogEvent {
     SetFog {
-        fog: FogSettings
+        fog: DistanceFog
     }
 }
 
@@ -146,7 +146,7 @@ pub fn object_spawn_reader_system(
 
 pub fn fog_updater_system(
     mut update_reader: EventReader<FogEvent>,
-    mut fog_query: Query<&mut FogSettings, With<MainCamera>>,
+    mut fog_query: Query<&mut DistanceFog, With<MainCamera>>,
 ) {
     for event in update_reader.read() {
         match event {
@@ -185,7 +185,7 @@ pub fn sfx_event_listener_system(
         match event {
             SFXEvent::CreateAudioEmitter { filepath, entity } => {
                 commands.entity(*entity).insert(
-                    AudioEmitter {
+                    SpatialAudioEmitter {
                         instances: vec![
                             sfx.play(asset_server.load(filepath))
                                 .looped()

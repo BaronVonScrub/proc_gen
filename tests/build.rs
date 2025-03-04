@@ -9,7 +9,7 @@ fn main() {
     generate_metallic_roughness_maps();
     generate_texture_meta_files();
     //generate_ui_sprites();
-    generate_ui_meta_files();
+    //generate_ui_meta_files();
 }
 
 /*fn generate_ui_sprites() {
@@ -33,7 +33,7 @@ fn main() {
     write(&dest_path, sprite_names_array).unwrap();
 }*/
 
-fn generate_ui_meta_files() {
+/*fn generate_ui_meta_files() {
     let ui_sprites_path = Path::new("assets/ui");
     for entry in fs::read_dir(ui_sprites_path).unwrap() {
         let path = entry.unwrap().path();
@@ -45,13 +45,13 @@ fn generate_ui_meta_files() {
             }
         }
     }
-}
+}*/
 
-fn create_ui_meta_content() -> String {
+/*fn create_ui_meta_content() -> String {
     r#"(
         meta_format_version: "1.0",
         asset: Load(
-            loader: "bevy_render::texture::image_loader::ImageLoader",
+            loader: "bevy_image::image_loader::ImageLoader",
             settings: (
                 format: FromExtension,
                 is_srgb: true,
@@ -62,7 +62,7 @@ fn create_ui_meta_content() -> String {
         ),
     )
     "#.to_string()
-}
+}*/
 
 fn generate_texture_meta_files() {
     let materials_path = Path::new("assets/materials");
@@ -92,8 +92,8 @@ fn create_meta_content(is_normal_map: bool) -> String {
     format!(r#"(
     meta_format_version: "1.0",
     asset: Process(
-        processor: "bevy_asset::processor::process::LoadAndSave<bevy_render::texture::image_loader::ImageLoader, bevy_render::texture::compressed_image_saver::CompressedImageSaver>",
-        settings: (
+        processor: "bevy_asset::processor::process::LoadTransformAndSave<bevy_image::image_loader::ImageLoader, bevy_asset::transformer::IdentityAssetTransformer<bevy_image::image::Image>, bevy_image::compressed_image_saver::CompressedImageSaver>",
+            settings: (
             loader_settings: (
                 format: FromExtension,
                 is_srgb: {},
@@ -111,8 +111,9 @@ fn create_meta_content(is_normal_map: bool) -> String {
                     anisotropy_clamp: 1,
                     border_color: None,
                 )),
-                asset_usage:("MAIN_WORLD | RENDER_WORLD"),
+                asset_usage: ("MAIN_WORLD | RENDER_WORLD"),
             ),
+            transformer_settings: (),
             saver_settings: (),
         ),
     ),

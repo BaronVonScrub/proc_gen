@@ -3,7 +3,7 @@ use bevy::prelude::{Color};
 use bevy::pbr::{PointLight, SpotLight, DirectionalLight, AmbientLight};
 use bevy::math::Vec3;
 use bevy::pbr::FogFalloff;
-use bevy::pbr::FogSettings;
+use bevy::pbr::DistanceFog;
 
 #[derive(Serialize, Deserialize)]
 #[serde(remote = "PointLight")]
@@ -15,6 +15,7 @@ pub struct SerializablePointLight {
     pub shadows_enabled: bool,
     pub shadow_depth_bias: f32,
     pub shadow_normal_bias: f32,
+    pub shadow_map_near_z: f32,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -29,6 +30,7 @@ pub struct SerializableSpotLight {
     pub shadow_normal_bias: f32,
     pub outer_angle: f32,
     pub inner_angle: f32,
+    pub shadow_map_near_z: f32,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -49,8 +51,8 @@ pub struct SerializableAmbientLight{
 }
 
 #[derive(Serialize, Deserialize)]
-#[serde(remote = "FogSettings")]
-pub struct SerializableFogSettings {
+#[serde(remote = "DistanceFog")]
+pub struct SerializableDistanceFog {
     pub color: Color,
     pub directional_light_color: Color,
     pub directional_light_exponent: f32,
