@@ -58,7 +58,7 @@ pub(crate) fn generate_map(mut c: Commands) {
         .spawn_empty()
         .insert(Name::new("GeneratedRoot"))
         .insert(Transform::default())
-        .Insert(Visibility::default())
+        .insert(Visibility::default())
         .insert(GeneratedRoot)
         .id();
 
@@ -88,7 +88,7 @@ pub(crate) fn reset_on_space(
         .spawn_empty()
         .insert(Name::new("GeneratedRoot"))
         .insert(Transform::default())
-        .Insert(Visibility::default())
+        .insert(Visibility::default())
         .insert(GeneratedRoot)
         .id();
 
