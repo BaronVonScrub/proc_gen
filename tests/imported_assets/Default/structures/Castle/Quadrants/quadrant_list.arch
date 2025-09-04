@@ -1,0 +1,78 @@
+(
+    structure_name: "Quadrant List",
+    tags: [],
+    data: [
+        (Nest(Ref(
+            structure: "Castle/Quadrants/spoon_quadrant",
+            ownership: Inherit,
+        )), (
+            translation: (0.0, 0.0, 0.0),
+            rotation: (0.0, 0.0, 0.0),
+            scale: (1.0, 1.0, 1.0),
+        )),
+        (Nest(Ref(
+            structure: "Castle/Quadrants/hook_quadrant",
+            ownership: Inherit,
+        )), (
+            translation: (0.0, 0.0, 0.0),
+            rotation: (0.0, 0.0, 0.0),
+            scale: (1.0, 1.0, 1.0),
+        )),
+        (Nest(Ref(
+            structure: "Castle/Quadrants/fork_quadrant",
+            ownership: Inherit,
+        )), (
+            translation: (0.0, 0.0, 0.0),
+            rotation: (0.0, 0.0, 0.0),
+            scale: (1.0, 1.0, 1.0),
+        )),
+        (Nest(Ref(
+            structure: "Castle/Quadrants/knife_quadrant",
+            ownership: Inherit,
+        )), (
+            translation: (0.0, 0.0, 0.0),
+            rotation: (0.0, 0.0, 0.0),
+            scale: (1.0, 1.0, 1.0),
+        )),
+        (Nest(Ref(
+            structure: "Castle/Quadrants/spoon_quadrant",
+            ownership: Inherit,
+        )), (
+            translation: (0.0, 0.0, 0.0),
+            rotation: (0.0, 0.0, 0.0),
+            scale: (1.0, 1.0, 1.0),
+        )),
+        (Nest(Ref(
+            structure: "Castle/Quadrants/hook_quadrant",
+            ownership: Inherit,
+        )), (
+            translation: (0.0, 0.0, 0.0),
+            rotation: (0.0, 0.0, 0.0),
+            scale: (1.0, 1.0, 1.0),
+        )),
+        (Nest(Ref(
+            structure: "Castle/Quadrants/fork_quadrant",
+            ownership: Inherit,
+        )), (
+            translation: (0.0, 0.0, 0.0),
+            rotation: (0.0, 0.0, 0.0),
+            scale: (1.0, 1.0, 1.0),
+        )),
+        (Nest(Ref(
+            structure: "Castle/Quadrants/knife_quadrant",
+            ownership: Inherit,
+        )), (
+            translation: (0.0, 0.0, 0.0),
+            rotation: (0.0, 0.0, 0.0),
+            scale: (1.0, 1.0, 1.0),
+        )),
+        (Nest(Ref(
+            structure: "Castle/Quadrants/empty_quadrant",
+            ownership: Inherit,
+        )), (
+            translation: (0.0, 0.0, 0.0),
+            rotation: (0.0, 0.0, 0.0),
+            scale: (1.0, 1.0, 1.0),
+        ))
+    ],
+)

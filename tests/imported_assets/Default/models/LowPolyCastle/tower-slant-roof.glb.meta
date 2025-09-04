@@ -1,0 +1,18 @@
+(
+    meta_format_version: "1.0",
+    processed_info: Some((
+        hash: (81, 68, 97, 215, 223, 90, 16, 81, 174, 122, 24, 163, 17, 41, 40, 110, 182, 228, 233, 88, 210, 25, 85, 254, 231, 227, 89, 115, 109, 176, 62, 133),
+        full_hash: (81, 68, 97, 215, 223, 90, 16, 81, 174, 122, 24, 163, 17, 41, 40, 110, 182, 228, 233, 88, 210, 25, 85, 254, 231, 227, 89, 115, 109, 176, 62, 133),
+        process_dependencies: [],
+    )),
+    asset: Load(
+        loader: "bevy_gltf::loader::GltfLoader",
+        settings: (
+            load_meshes: ("MAIN_WORLD | RENDER_WORLD"),
+            load_materials: ("MAIN_WORLD | RENDER_WORLD"),
+            load_cameras: true,
+            load_lights: true,
+            include_source: false,
+        ),
+    ),
+)

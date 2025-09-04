@@ -1,0 +1,14 @@
+(
+    structure_name: "Quadrant",
+    tags: [],
+    data: [
+        (Choose(list: Ref(
+            structure: "Castle/Quadrants/quadrant_list",
+            ownership: Inherit,
+        )), (
+            translation: (0.0, 0.0, 0.0),
+            rotation: (0.0, 0.0, 0.0),
+            scale: (1.0, 1.0, 1.0),
+        ))
+    ],
+)

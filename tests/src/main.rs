@@ -66,15 +66,7 @@ fn main() {
     app.add_plugins(AtmospherePlugin);
 
     app.add_systems(OnEnter(proc_gen::management::material_autoloader::GameState::Playing), (ingame_setup,generation::generate_map).chain());
-
-    // Setup events
-    app.add_event::<ObjectSpawnEvent>()
-        .add_event::<FogEvent>()
-        .add_event::<DirLightEvent>()
-        .add_event::<AmbLightEvent>()
-        .add_event::<BGMusicEvent>()
-        .add_event::<SFXEvent>()
-        .add_event::<SelectiveReplacementEvent>();
+    app.add_systems(Update, generation::reset_on_space);
 
     // Setup map generator
     app.add_plugins(GeneratorPlugin);

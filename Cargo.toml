@@ -65,6 +65,8 @@ futures = "0.3.30"
 itertools = "0.14.0"
 lazy_static = "1.4.0"
 bevy_image = "0.15.3"
+uuid = "1.12.0"
+typetag = "0.2.19"
 
 [dependencies.bevy_kira_audio]
 version = "0.22.0"

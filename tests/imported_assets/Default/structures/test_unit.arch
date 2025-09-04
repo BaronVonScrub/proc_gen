@@ -1,0 +1,27 @@
+(
+    structure_name: "Test Unit",
+    tags: [],
+    data: [
+        (Object(
+            path:"models/LowPolySurvival/barrel.glb#Scene0",
+            collider: Some(
+                ColliderInfo(
+                    collider_type: Cylinder(
+                        half_height: 0.16,
+                        radius: 0.12,
+                    ),
+                    priority: 0,
+                    behaviour: Dynamic,
+                )
+            ),
+            offset: (0.0, -0.16, 0.0),
+            ownership: Team(1),
+            selectable: true,
+            object_type: Unit,
+        ), (
+            translation: (0.0, 0.16, 0.0),
+            rotation: (0.0, 0.0, 0.0),
+            scale: (1.0, 1.0, 1.0),
+        )),
+    ],
+)

@@ -3,7 +3,7 @@
     tags: [],
     data: [
         (Nest(Ref(
-            structure: "Castle/WallParts/wall_corner",
+            structure: "Castle/WallParts/wall_corner_both_doors",
             ownership: Inherit,
         )), (
         translation: (2.0, 0.0, 0.0),

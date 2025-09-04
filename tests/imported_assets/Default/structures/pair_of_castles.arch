@@ -1,0 +1,22 @@
+(   //Just testing the ability to comment
+    structure_name: "Pair Of Castles",
+    tags: [],
+    data: [
+        (Nest(Ref(
+            structure: "Castle/castle",
+            ownership: Team(1),
+        )), (
+            translation: (-5.0, 0.0, 0.0),
+            rotation: (0.0, 0.0, 0.0),
+            scale: (1.0, 1.0, 1.0),
+        )),
+        (Nest(Ref(
+            structure: "Castle/damaged_castle",
+            ownership: Team(2),
+        )), (
+            translation: (5.0, 0.0, 0.0),
+            rotation: (0.0, 0.0, 0.0),
+            scale: (1.0, 1.0, 1.0),
+        )),
+    ],
+)

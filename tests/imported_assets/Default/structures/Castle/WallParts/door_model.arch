@@ -1,0 +1,28 @@
+(
+    structure_name: "Door Model",
+    tags: [],
+    data: [
+        (Object(
+            path:"models/LowPolyCastle/wall-doorway.glb#Scene0",
+            collider: Some(
+            ColliderInfo(
+                collider_type: Cuboid(
+                    hx:0.22,
+                    hy:0.6,
+                    hz:0.49,
+                ),
+                priority: 0,
+                behaviour: Kinematic,
+            )
+            ),
+            offset: (0.22, -0.6, 0.0),
+            ownership: Inherit,
+            selectable: false,
+            object_type: Building,
+        ), (
+            translation: (-0.22, 1.0, 0.0),
+            rotation: (0.0, 0.0, 0.0),
+            scale: (1.0, 2.0, 2.0),
+        )),
+    ],
+)

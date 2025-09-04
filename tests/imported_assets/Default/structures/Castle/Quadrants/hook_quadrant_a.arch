@@ -1,0 +1,47 @@
+(
+    structure_name: "Hook Quadrant A",
+    tags: [],
+    data: [
+        (Nest(Ref(
+            structure: "Castle/Sectors/Sector",
+            ownership: Inherit,
+        )), (
+            translation: (-2.0, 0.0, 0.0),
+            rotation: (0.0, 0.0, 0.0),
+            scale: (1.0, 1.0, 1.0),
+        )),
+        (Nest(Ref(
+            structure: "Castle/Sectors/Sector",
+            ownership: Inherit,
+        )), (
+        translation: (-2.0, 0.0, 2.0),
+        rotation: (0.0, 0.0, 0.0),
+        scale: (1.0, 1.0, 1.0),
+        )),
+        (Nest(Ref(
+            structure: "Castle/WallParts/dead_end",
+            ownership: Inherit,
+        )), (
+            translation: (-2.0, 0.0, 0.0),
+            rotation: (0.0, 90.0, 0.0),
+            scale: (1.0, 1.0, 1.0),
+        )),
+        (Nest(Ref(
+            structure: "Castle/WallParts/wall_corner",
+            ownership: Inherit,
+        )), (
+            translation: (-2.0, 0.0, 2.0),
+            rotation: (0.0, 270.0, 0.0),
+            scale: (1.0, 1.0, 1.0),
+        )),
+        (Nest(Ref(
+            structure: "Castle/WallParts/wall_model",
+            ownership: Inherit,
+        )), (
+            translation: (0.0, 0.0, 0.5),
+            rotation: (0.0, 90.0, 0.0),
+            scale: (1.0, 1.0, 1.0),
+        )),
+    ],
+
+)

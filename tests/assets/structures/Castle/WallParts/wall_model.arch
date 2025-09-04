@@ -1,6 +1,8 @@
 (
     structure_name: "Wall Model",
-    tags: [],
+    tags: [
+        "",
+    ],
     data: [
         (Object(
             path:"models/LowPolyCastle/wall-narrow.glb#Scene0",

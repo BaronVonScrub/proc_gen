@@ -11,6 +11,7 @@ use crate::core::rand_data::RandData;
 use crate::core::sample_size::SampleSize;
 use crate::core::spread_data::SpreadData;
 use crate::core::structure_reference::StructureReference;
+use crate::event_system::spawn_events::*;
 use crate::management::structure_management::import_structure;
 use crate::spawning::euler_transform::EulerTransform;
 use crate::spawning::object_logic::{ObjectType, Ownership};
@@ -183,5 +184,124 @@ impl StructureKey {
                 }
             }
         }
+    }
+}
+
+use bevy::ecs::world::World;
+use bevy::prelude::*;
+
+impl StructureKey {
+    pub fn dispatch_event(&self, transform: EulerTransform, parent: Option<Entity>, commands: &mut Commands) {
+        let event_key = self.clone(); // Clone self to move into the closure
+
+        commands.queue(move |world: &mut World| {
+            match event_key {
+                StructureKey::Object { .. } => {
+                    world.send_event(SceneSpawnEvent {
+                        data: event_key,
+                        transform,
+                        parent
+                    });
+                }
+                StructureKey::PointLight(light) => {
+                    world.send_event(PointLightSpawnEvent { light, transform, parent });
+                }
+                StructureKey::SpotLight(light) => {
+                    world.send_event(SpotLightSpawnEvent { light, transform, parent });
+                }
+                StructureKey::DirectionalLight(light) => {
+                    world.send_event(DirectionalLightSpawnEvent { light, transform, parent });
+                }
+                StructureKey::AmbientLight(light) => {
+                    world.send_event(AmbientLightSpawnEvent { light, transform, parent });
+                }
+                StructureKey::DistanceFog(fog) => {
+                    world.send_event(DistanceFogSpawnEvent { fog });
+                }
+                StructureKey::SoundEffect(file) => {
+                    world.send_event(SoundEffectSpawnEvent { file });
+                }
+                StructureKey::BackgroundMusic(file) => {
+                    world.send_event(BackgroundMusicSpawnEvent { file });
+                }
+                StructureKey::Nest(reference) => {
+                    world.send_event(NestSpawnEvent { reference, transform, parent });
+                }
+                StructureKey::Choose { list } => {
+                    world.send_event(ChooseSpawnEvent { list, transform, parent });
+                }
+                StructureKey::ChooseSome { list, count } => {
+                    world.send_event(ChooseSomeSpawnEvent { list, count, transform, parent });
+                }
+                StructureKey::Rand { reference, rand } => {
+                    world.send_event(RandSpawnEvent { reference, rand, transform, parent });
+                }
+                StructureKey::ProbabilitySpawn { reference, probability } => {
+                    world.send_event(ProbabilitySpawnEvent { reference, probability, transform, parent });
+                }
+                StructureKey::Loop { reference, shift_transform, child_transform, count } => {
+                    world.send_event(LoopSpawnEvent {
+                        reference,
+                        shift_transform,
+                        child_transform,
+                        count,
+                        transform,
+                        parent,
+                    });
+                }
+                StructureKey::NestingLoop { reference, repeated_transform, count } => {
+                    world.send_event(NestingLoopSpawnEvent {
+                        reference,
+                        repeated_transform,
+                        count,
+                        transform,
+                        parent
+                    });
+                }
+                StructureKey::NoiseSpawn { reference, fbm, sample_size, count, exclusivity_radius, resolution_modifier } => {
+                    world.send_event(NoiseSpawnEvent {
+                        reference,
+                        fbm,
+                        sample_size,
+                        count,
+                        exclusivity_radius,
+                        resolution_modifier,
+                        transform,
+                        parent,
+                    });
+                }
+                StructureKey::PathSpawn { reference, points, tension, spread, count } => {
+                    world.send_event(PathSpawnEvent {
+                        reference,
+                        points,
+                        tension,
+                        spread,
+                        count,
+                        transform,
+                        parent,
+                    });
+                }
+                StructureKey::Reflection { reference, reflection_plane, reflection_point, reflect_child } => {
+                    world.send_event(ReflectionSpawnEvent {
+                        reference,
+                        reflection_plane,
+                        reflection_point,
+                        reflect_child,
+                        transform,
+                        parent,
+                    });
+                }
+                StructureKey::SelectiveReplacement { initial_reference, replacement_reference, tags, replace_count } => {
+                    world.send_event(SelectiveReplacementSpawnEvent {
+                        initial_reference,
+                        replacement_reference,
+                        tags,
+                        replace_count,
+                        transform,
+                        parent,
+                    });
+                }
+            }
+        });
     }
 }
