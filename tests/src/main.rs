@@ -5,7 +5,6 @@ use bevy_kira_audio::{AudioApp, AudioPlugin, SpatialAudioPlugin};
 use bevy_pbr::CascadeShadowConfig;
 use proc_gen::core::components::MainDirectionalLight;
 use proc_gen::core::generator_plugin::GeneratorPlugin;
-use proc_gen::systems::events::*;
 
 mod input_manager;
 mod camera;
