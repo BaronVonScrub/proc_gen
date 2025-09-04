@@ -1,0 +1,35 @@
+(
+    structure_name: "Tower Structure",
+    tags: ["Roof"],
+    data: [
+        (Choose(list: Raw(
+            structure: (
+                structure_name: "Tower Structure Choice",
+                tags: [],
+                data: [
+                    (Nest(Ref(
+                        structure: "Castle/Sectors/tower-structure-tier1",
+                        ownership: Inherit,
+                    )), (
+                        translation: (0.0, 2.2, 0.0),
+                        rotation: (0.0, 0.0, 0.0),
+                        scale: (1.0, 1.0, 1.0),
+                    )),
+                    (Nest(Ref(
+                        structure: "Castle/Sectors/tower-structure-tier2",
+                        ownership: Inherit,
+                    )), (
+                        translation: (0.0, 2.2, 0.0),
+                        rotation: (0.0, 0.0, 0.0),
+                        scale: (1.0, 1.0, 1.0),
+                    )),
+                ],
+            ),
+            ownership: Inherit,
+        )), (
+            translation: (0.0, 0.0, 0.0),
+            rotation: (0.0, 0.0, 0.0),
+            scale: (1.0, 1.0, 1.0),
+        )),
+    ],
+)

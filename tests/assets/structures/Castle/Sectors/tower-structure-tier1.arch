@@ -1,0 +1,30 @@
+(
+    structure_name: "Tower Structure Tier 1",
+    tags: ["Roof"],
+    data: [
+        (Object(
+            path:"models/LowPolyCastle/tower-square-mid-windows.glb#Scene0",
+            collider: None,
+            offset: (0.0, 0.0, 0.0),
+            ownership: Inherit,
+            selectable: false,
+            object_type: Building,
+        ), (
+            translation: (0.0, 0.0, 0.0),
+            rotation: (0.0, 0.0, 0.0),
+            scale: (2.9, 1.5, 2.9),
+        )),
+        (Object(
+            path:"models/LowPolyCastle/tower-square-top-roof.glb#Scene0",
+            collider: None,
+            offset: (0.0, 0.0, 0.0),
+            ownership: Inherit,
+            selectable: false,
+            object_type: Building,
+        ), (
+            translation: (0.0, 1.1, 0.0),
+            rotation: (0.0, 0.0, 0.0),
+            scale: (2.0, 2.9, 2.0),
+        )),
+    ],
+)

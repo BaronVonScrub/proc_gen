@@ -1,0 +1,18 @@
+(
+    structure_name: "Tower Square Top Roof",
+    tags: ["Roof"],
+    data: [
+        (Object(
+            path:"models/LowPolyCastle/tower-square-top-roof.glb#Scene0",
+            collider: None,
+            offset: (0.0, 0.0, 0.0),
+            ownership: Inherit,
+            selectable: false,
+            object_type: Building,
+        ), (
+            translation: (0.0, 0.0, 0.0),
+            rotation: (0.0, 0.0, 0.0),
+            scale: (1.0, 1.0, 1.0),
+        )),
+    ],
+)

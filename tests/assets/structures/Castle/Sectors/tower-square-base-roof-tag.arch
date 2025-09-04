@@ -1,0 +1,28 @@
+(
+    structure_name: "Tower Square Base (Roof Tagged)",
+    tags: ["Roof"],
+    data: [
+        (Object(
+            path:"models/LowPolyCastle/tower-square-base.glb#Scene0",
+            collider: Some(
+            ColliderInfo(
+                collider_type: Cuboid(
+                    hx:0.45,
+                    hy:1.01,
+                    hz:0.45,
+                ),
+                priority: 0,
+                behaviour: Kinematic,
+            )
+            ),
+            offset: (0.0, 0.0, 0.0),
+            ownership: Inherit,
+            selectable: false,
+            object_type: Building,
+        ), (
+            translation: (0.0, -0.1, 0.0),
+            rotation: (0.0, 0.0, 0.0),
+            scale: (2.2, 0.1, 2.2),
+        )),
+    ],
+)
