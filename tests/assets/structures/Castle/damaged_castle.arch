@@ -8,7 +8,7 @@
                 ownership: Team(1),
             ),
             replacement_reference: Ref(
-                structure: "Castle/WallParts/door_model",
+                structure: "Castle/WallParts/doorway_with_door",
                 ownership: Team(1),
             ),
             tags: ["Door Candidate"],

@@ -24,6 +24,59 @@
             rotation: (0.0, 0.0, 0.0),
             scale: (2.2, 0.1, 2.2),
         )),
+        (Choose(list: Raw(
+            structure: (
+                structure_name: "Sector Choice",
+                tags: [],
+                data: [
+                    (Nest(Ref(
+                        structure: "Castle/Sectors/flat-roof",
+                        ownership: Inherit,
+                    )), (
+                        translation: (0.0, 0.0, 0.0),
+                        rotation: (0.0, 0.0, 0.0),
+                        scale: (1.0, 1.0, 1.0),
+                    )),
+                    (Nest(Ref(
+                        structure: "Castle/Sectors/flat-roof",
+                        ownership: Inherit,
+                    )), (
+                        translation: (0.0, 0.0, 0.0),
+                        rotation: (0.0, 0.0, 0.0),
+                        scale: (1.0, 1.0, 1.0),
+                    )),
+                                        (Nest(Ref(
+                        structure: "Castle/Sectors/flat-roof",
+                        ownership: Inherit,
+                    )), (
+                        translation: (0.0, 0.0, 0.0),
+                        rotation: (0.0, 0.0, 0.0),
+                        scale: (1.0, 1.0, 1.0),
+                    )),
+                                        (Nest(Ref(
+                        structure: "Castle/Sectors/flat-roof",
+                        ownership: Inherit,
+                    )), (
+                        translation: (0.0, 0.0, 0.0),
+                        rotation: (0.0, 0.0, 0.0),
+                        scale: (1.0, 1.0, 1.0),
+                    )),
+                    (Nest(Ref(
+                        structure: "Castle/Sectors/tower-structure",
+                        ownership: Inherit,
+                    )), (
+                        translation: (0.0, 0.0, 0.0),
+                        rotation: (0.0, 0.0, 0.0),
+                        scale: (1.0, 1.0, 1.0),
+                    )),
+                ],
+            ),
+            ownership: Inherit,
+        )), (
+            translation: (0.0, 0.0, 0.0),
+            rotation: (0.0, 0.0, 0.0),
+            scale: (1.0, 1.0, 1.0),
+        )),
     ],
 
 )
