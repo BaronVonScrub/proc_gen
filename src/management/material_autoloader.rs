@@ -74,7 +74,7 @@ fn preload_materials_system(
             "albedo" => entry.0 = Some(file_path.to_string()),
             "ao" => entry.1 = Some(file_path.to_string()),
             "normal" => entry.2 = Some(file_path.to_string()),
-            "met_roughness" => entry.3 = Some(file_path.to_string()),
+            "met_roughness" | "metallicRoughness" => entry.3 = Some(file_path.to_string()),
             _ => {}
         }
     }
@@ -92,6 +92,8 @@ fn preload_materials_system(
             metallic_roughness_texture: met_rough_tex,
             metallic: 0.1,
             perceptual_roughness: 0.9,
+            // Many texture libraries author normal maps for DirectX (-Y). Flip to match Bevy's expected +Y.
+            flip_normal_map_y: true,
             ..Default::default()
         });
 
@@ -103,7 +105,8 @@ fn preload_materials_system(
 
 // 🚀 Utility: Extract Material Data
 fn extract_tex_data(tex_name: &str) -> (String, String) {
-    let texture_types = ["albedo", "ao", "normal", "met_roughness"];
+    // Support multiple common conventions for texture suffixes
+    let texture_types = ["albedo", "ao", "normal", "met_roughness", "metallicRoughness"];
     let parts: Vec<&str> = tex_name.split('/').collect();
     let materials_index = parts.iter().position(|&r| r == "materials").unwrap_or(0);
     let material_name = parts.get(materials_index + 1).unwrap_or(&"").to_string();

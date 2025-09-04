@@ -3,6 +3,7 @@ use crate::core::structure::Structure;
 use crate::management::structure_management::import_structure;
 use crate::event_system::spawn_events::StructureSpawnEvent;
 use crate::spawning::euler_transform::EulerTransform;
+use crate::core::tags::Tags;
 
 pub fn structure_spawn_listener(
     mut commands: Commands,
@@ -36,6 +37,11 @@ fn spawn_structure(
     // Load the structure
     let structure = import_structure(structure_name.clone())
         .map_err(|e| format!("Failed to import structure {}: {}", structure_name, e))?;
+
+    // Attach structure-level tags (if any) to the container so children can react to them
+    if !structure.tags.is_empty() {
+        commands.entity(entity).insert(Tags(structure.tags.clone()));
+    }
 
     // Spawn its components using events
     spawn_structure_data(commands, &structure, Transform::IDENTITY, Some(entity))?;

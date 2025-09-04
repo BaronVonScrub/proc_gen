@@ -1,10 +1,10 @@
 (
     structure_name: "Atmospheric Setup",
-    tags: [],
+    tags: ["MainDirectionalLight"],
     data: [
         (DirectionalLight((
-            color: Srgba((red:1.0,green:1.0,blue:0.91,alpha:1.0)),
-            illuminance: 30000.0,
+            color: Srgba((red:0.5,green:0.5,blue:0.91,alpha:1.0)),
+            illuminance: 3000.0,
             shadows_enabled: true,
             shadow_depth_bias: 0.02,
             shadow_normal_bias: 1.8,

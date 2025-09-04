@@ -33,6 +33,7 @@ use crate::core::spread_data::SpreadData;
 use bevy_kira_audio::{Audio, AudioChannel, AudioControl};
 use bevy_kira_audio::AudioSource;
 use crate::management::audio_management::SoundEffects;
+use bevy::pbr::CascadeShadowConfig;
 
 // Tracks a selective replacement that should be deferred until the subtree has finished spawning.
 #[derive(Component)]
@@ -221,34 +222,45 @@ pub fn directional_light_spawn_listener(
     mut commands: Commands,
     mut reader: EventReader<DirectionalLightSpawnEvent>,
     existing: Query<Entity, With<MainDirectionalLight>>,
+    parent_tags: Query<&Tags>,
 ) {
     for event in reader.read() {
-        if let Some(parent) = event.parent {
-            // Spawn a new directional light attached to the provided parent
-            let entity = commands
-                .spawn_empty()
-                .insert(event.light.clone())
-                .insert(Transform::from(event.transform.clone()))
-                .insert(InheritedVisibility::default())
-                .insert(Name::new("DirectionalLight"))
-                .id();
-            commands.entity(entity).set_parent(parent);
+        // Determine if this should be the main world directional light
+        let is_main = match event.parent {
+            Some(parent) => parent_tags.get(parent).map(|t| t.contains("MainDirectionalLight")).unwrap_or(false),
+            None => true,
+        };
+
+        // Choose target entity: update existing main if present, else spawn new; non-main always spawns new
+        let mut created_new = false;
+        let target = if is_main {
+            if let Some(e) = existing.iter().next() { e } else { created_new = true; commands.spawn_empty().id() }
         } else {
-            // Update existing main directional light if present, otherwise spawn a new one
-            if let Some(entity) = existing.iter().next() {
-                commands
-                    .entity(entity)
-                    .insert(event.light.clone())
-                    .insert(Transform::from(event.transform.clone()));
-            } else {
-                commands
-                    .spawn_empty()
-                    .insert(event.light.clone())
-                    .insert(Transform::from(event.transform.clone()))
-                    .insert(InheritedVisibility::default())
-                    .insert(Name::new("MainDirectionalLight"))
-                    .insert(MainDirectionalLight);
-            }
+            created_new = true;
+            commands.spawn_empty().id()
+        };
+
+        // Common inserts
+        let mut ecmd = commands.entity(target);
+        ecmd
+            .insert(event.light.clone())
+            .insert(Transform::from(event.transform.clone()));
+        if created_new { ecmd.insert(InheritedVisibility::default()); }
+
+        if is_main {
+            // Set up as the main directional light (do not parent under structure container)
+            ecmd
+                .insert(Name::new("MainDirectionalLight"))
+                .insert(CascadeShadowConfig {
+                    bounds: vec![0.0, 30.0, 90.0, 270.0],
+                    overlap_proportion: 0.2,
+                    minimum_distance: 0.0,
+                })
+                .insert(MainDirectionalLight);
+        } else {
+            // Regular directional light, parent under provided container
+            ecmd.insert(Name::new("DirectionalLight"));
+            if let Some(parent) = event.parent { commands.entity(parent).add_child(target); }
         }
     }
 }

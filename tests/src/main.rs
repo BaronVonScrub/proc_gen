@@ -2,8 +2,6 @@ use bevy::prelude::*;
 use bevy_atmosphere::plugin::AtmospherePlugin;
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_kira_audio::{AudioApp, AudioPlugin, SpatialAudioPlugin};
-use bevy_pbr::CascadeShadowConfig;
-use proc_gen::core::components::MainDirectionalLight;
 use proc_gen::core::generator_plugin::GeneratorPlugin;
 
 mod input_manager;
@@ -64,7 +62,7 @@ fn main() {
     // Setup skybox (atmosphere)
     app.add_plugins(AtmospherePlugin);
 
-    app.add_systems(OnEnter(proc_gen::management::material_autoloader::GameState::Playing), (ingame_setup,generation::generate_map).chain());
+    app.add_systems(OnEnter(proc_gen::management::material_autoloader::GameState::Playing), generation::generate_map);
     app.add_systems(Update, generation::reset_on_space);
 
     // Setup map generator
@@ -94,31 +92,4 @@ fn main() {
     // app.add_plugins(RapierDebugRenderPlugin::default());
 
     app.run();
-}
-fn ingame_setup(
-    mut commands: Commands,
-    //mut rapier_config: ResMut<RapierConfiguration>
-) {
-    /*rapier_config.timestep_mode = TimestepMode::Variable {
-        max_dt: 10.0,
-        time_scale: 10.0,
-        substeps: 10,
-    };*/
-
-    commands.spawn_empty()
-        .insert( DirectionalLight {
-            shadows_enabled: true,
-            illuminance: 30000.0,
-            color: Color::srgba(171.0 / 255.0, 183.0 / 255.0, 255.0 / 255.0, 1.0),
-            ..default()
-        })
-        .insert(Transform::from_rotation(
-            Quat::from_euler(EulerRot::XYZ,0.0,3.1,-6.3)))
-        .insert(CascadeShadowConfig {
-            bounds: vec![0.0, 30.0, 90.0, 270.0],
-            overlap_proportion: 0.2,
-            minimum_distance: 0.0
-        })
-        .insert(InheritedVisibility::default())
-        .insert(MainDirectionalLight);
 }
