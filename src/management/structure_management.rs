@@ -84,3 +84,10 @@ pub fn import_structure(structure_name: String) -> Result<Structure, ron::Error>
         Err(e) => Err(e.into())
     }
 }
+
+/// Clears the in-memory cache of loaded `Structure`s so future imports re-read from disk.
+pub fn clear_structure_cache() {
+    if let Ok(mut cache) = STRUCTURE_CACHE.lock() {
+        cache.clear();
+    }
+}

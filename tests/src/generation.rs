@@ -14,6 +14,7 @@ use proc_gen::event_system::event_listeners::{
 };
 use proc_gen::spawning::helpers::GenRng;
 use std::time::{SystemTime, UNIX_EPOCH};
+use proc_gen::management::structure_management::clear_structure_cache;
 
 #[derive(Component)]
 pub(crate) struct GeneratedRoot;
@@ -80,6 +81,9 @@ pub(crate) fn reset_on_space(
     let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default();
     let seed = now.as_nanos() as u64;
     *gen_rng = GenRng::new(seed);
+
+    // Clear cached .arch structures so subsequent imports re-read from disk
+    clear_structure_cache();
 
     // Despawn previous generation root(s)
     for root in roots.iter() {
