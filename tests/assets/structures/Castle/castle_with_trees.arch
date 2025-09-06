@@ -36,5 +36,52 @@
             // X/Z define the scatter radius in world units; match the ground plane scale so areas overlap
             scale: (20.0, 1.0, 20.0),
         )),
+
+        // Place three MapExits at random directions on the edge of the circle (radius ~= 10)
+        (RandDistDir(
+            reference: Ref(
+                structure: "MapExit",
+                ownership: Team(1),
+            ),
+            dist_min: 10.0,
+            dist_max: 10.0,
+            angle_min_deg: 0.0,
+            angle_max_deg: 360.0,
+            y: 0.0,
+        ), (
+            translation: (0.0, 0.0, 0.0),
+            rotation: (0.0, 0.0, 0.0),
+            scale: (1.0, 1.0, 1.0),
+        )),
+        (RandDistDir(
+            reference: Ref(
+                structure: "MapExit",
+                ownership: Team(1),
+            ),
+            dist_min: 10.0,
+            dist_max: 10.0,
+            angle_min_deg: 0.0,
+            angle_max_deg: 360.0,
+            y: 0.0,
+        ), (
+            translation: (0.0, 0.0, 0.0),
+            rotation: (0.0, 0.0, 0.0),
+            scale: (1.0, 1.0, 1.0),
+        )),
+        (RandDistDir(
+            reference: Ref(
+                structure: "MapExit",
+                ownership: Team(1),
+            ),
+            dist_min: 10.0,
+            dist_max: 10.0,
+            angle_min_deg: 0.0,
+            angle_max_deg: 360.0,
+            y: 0.0,
+        ), (
+            translation: (0.0, 0.0, 0.0),
+            rotation: (0.0, 0.0, 0.0),
+            scale: (1.0, 1.0, 1.0),
+        )),
     ],
 )

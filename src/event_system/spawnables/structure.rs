@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 use crate::core::structure::Structure;
 use crate::management::structure_management::import_structure;
+use crate::core::structure_key::StructureKey;
 use crate::event_system::spawn_events::StructureSpawnEvent;
 use crate::spawning::euler_transform::EulerTransform;
 use crate::core::tags::Tags;
@@ -26,6 +27,7 @@ fn spawn_structure(
     let entity = commands.spawn_empty()
         .insert(Name::new(structure_name.clone()))
         .insert(Transform::from(event.transform.clone()))
+        .insert(GlobalTransform::default())
         .insert(InheritedVisibility::default())
         .id();
 
@@ -56,8 +58,17 @@ pub(crate) fn spawn_structure_data(
     parent: Option<Entity>,
 ) -> Result<Option<Entity>, String> {
     for (key, local_transform) in &structure.data {
-        let combined_transform = parent_transform * Transform::from(local_transform.clone());
-        key.dispatch_event(EulerTransform::from(combined_transform), parent, commands);
+        match key {
+            // Pass LOCAL transform to Rand so jiggle uses these as amplitude values
+            StructureKey::Rand { .. } => {
+                key.dispatch_event(local_transform.clone(), parent, commands);
+            }
+            // All other keys continue to use combined transform
+            _ => {
+                let combined_transform = parent_transform * Transform::from(local_transform.clone());
+                key.dispatch_event(EulerTransform::from(combined_transform), parent, commands);
+            }
+        }
     }
 
     Ok(parent)

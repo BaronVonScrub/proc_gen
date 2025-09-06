@@ -6,6 +6,7 @@ use crate::core::spread_data::SpreadData;
 use crate::core::structure_reference::StructureReference;
 use crate::spawning::euler_transform::EulerTransform;
 use crate::core::tmaterial::TMaterial;
+use crate::core::wobble::WobbleParams;
 use crate::core::structure_key::StructureKey;
 
 #[derive(Debug, Clone, Event)]
@@ -13,6 +14,18 @@ pub struct MeshSpawnEvent {
     pub mesh: Mesh,
     pub transform: EulerTransform,
     pub material: TMaterial,
+    pub parent: Option<Entity>,
+}
+
+#[derive(Debug, Clone, Event)]
+pub struct RandDistDirSpawnEvent {
+    pub reference: StructureReference,
+    pub dist_min: f32,
+    pub dist_max: f32,
+    pub angle_min_deg: f32,
+    pub angle_max_deg: f32,
+    pub y: f32,
+    pub transform: EulerTransform,
     pub parent: Option<Entity>,
 }
 
@@ -154,6 +167,20 @@ pub struct PathSpawnEvent {
 }
 
 #[derive(Debug, Clone, Event)]
+pub struct PathToTagSpawnEvent {
+    pub reference: StructureReference,
+    pub start: Vec3,
+    pub manual_points: Option<Vec<Vec3>>,
+    pub tag: String,
+    pub tension: f32,
+    pub spread: SpreadData,
+    pub count: u32,
+    pub wobble: Option<WobbleParams>,
+    pub transform: EulerTransform,
+    pub parent: Option<Entity>,
+}
+
+#[derive(Debug, Clone, Event)]
 pub struct ReflectionSpawnEvent {
     pub reference: StructureReference,
     pub reflection_plane: Plane3d,
@@ -179,4 +206,12 @@ pub struct SelectiveReplacementFinalizeEvent {
     pub replacement_reference: StructureReference,
     pub tags: Vec<String>,
     pub replace_count: usize,
+}
+
+#[derive(Debug, Clone, Event)]
+pub struct InPassSpawnEvent {
+    pub index: u8,
+    pub reference: StructureReference,
+    pub transform: EulerTransform,
+    pub parent: Option<Entity>,
 }

@@ -1,0 +1,7 @@
+(
+    structure_name: "MapExit",
+    tags: ["MapExit"],
+    data: [
+        // Intentionally empty: this structure serves as a tagged marker only
+    ],
+)

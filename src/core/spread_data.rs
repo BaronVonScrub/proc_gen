@@ -5,6 +5,7 @@ use serde::{Serialize, Deserialize};
 pub enum SpreadData {
     Regular,
     Gaussian(f32),
+    Constant(f32),
     Noise {
         fbm_data: FBMData,
         sample_size: f32,

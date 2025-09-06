@@ -35,5 +35,48 @@
             rotation: (0.0, 0.0, 0.0),
             scale: (1.0, 2.0, 2.0),
         )),
+        // Pass 2: compute a path from the base of the door to the nearest MapExit; no markers spawned (count=0)
+        (InPass(
+            index: 1,
+            reference: Raw(
+                structure: (
+                    structure_name: "Door Pathing",
+                    tags: [],
+                    data: [
+                        (PathToTag(
+                            reference: Ref(
+                                structure: "Survival/floor",
+                                ownership: Inherit,
+                            ),
+                            start: (1.0, 0.0, 0.0),
+                            // Manual control points in local space to steer initial tangent.
+                            // Flip Z sign to nudge to the other side of the door.
+                            manual_points: Some([
+                                (-1.0, 0.0, 0.0),
+                            ]),
+                            tag: "MapExit",
+                            tension: 0.0,
+                            spread: Constant(1.1),
+                            count: 1,
+                            wobble: Some((
+                                amplitude: 0.6,
+                                wavelength: 10.0,
+                                phase: 0.0,
+                                checkpoint_spacing: 1.0,
+                            )),
+                        ), (
+                            translation: (0.0, 0.0, 0.0),
+                            rotation: (0.0, 0.0, 0.0),
+                            scale: (1.0, 1.0, 1.0),
+                        )),
+                    ],
+                ),
+                ownership: Team(1),
+            ),
+        ), (
+            translation: (0.0, 0.0, 0.0),
+            rotation: (0.0, 0.0, 0.0),
+            scale: (1.0, 1.0, 1.0),
+        )),
     ],
 )

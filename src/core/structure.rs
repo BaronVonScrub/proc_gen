@@ -82,6 +82,8 @@ pub(crate) fn propagate_team_ownership(structure: &mut Structure, team_id: u8) {
             StructureKey::NestingLoop { reference, .. } |
             StructureKey::NoiseSpawn { reference, .. } |
             StructureKey::PathSpawn { reference, .. } |
+            StructureKey::PathToTag { reference, .. } |
+            StructureKey::RandDistDir { reference, .. } |
             StructureKey::Reflection { reference, .. } => {
                 update_ownership(reference, team_id);
             }

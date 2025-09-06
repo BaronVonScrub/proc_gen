@@ -31,6 +31,480 @@ pub struct GenerationOnlyColliderPending {
     pub stable_frames: u8,
 }
 
+// Persistent queue for deferred InPass items
+#[derive(Resource, Default)]
+pub struct PendingInPass(pub Vec<InPassSpawnEvent>);
+
+// Collect InPass events into a persistent queue and update highest pass index
+pub fn in_pass_spawn_listener(
+    mut reader: EventReader<InPassSpawnEvent>,
+    mut highest: ResMut<HighestPassIndex>,
+    mut pending: ResMut<PendingInPass>,
+) {
+    for event in reader.read() {
+        if event.index > highest.0 { highest.0 = event.index; }
+        println!(
+            "[InPass] queued index={} parent={:?} (highest now {})",
+            event.index, event.parent, highest.0
+        );
+        pending.0.push(event.clone());
+    }
+}
+
+// Drain and execute only the items for the current pass
+pub fn process_pending_inpass(
+    mut commands: Commands,
+    mut pending: ResMut<PendingInPass>,
+    cur: Res<CurrentPass>,
+    mut activity: ResMut<SpawnActivity>,
+) {
+    if pending.0.is_empty() { return; }
+    let mut rest: Vec<InPassSpawnEvent> = Vec::new();
+    let mut any_spawned = false;
+    for ev in pending.0.drain(..) {
+        if ev.index == cur.0 {
+            any_spawned = true;
+            // Derive a label for logging
+            let label = match &ev.reference {
+                StructureReference::Raw { structure, .. } => structure.structure_name.clone(),
+                StructureReference::Ref { structure, .. } => structure.clone(),
+            };
+            println!(
+                "[InPass] spawning index={} structure='{}' parent={:?}",
+                ev.index, label, ev.parent
+            );
+            match Structure::try_from(&ev.reference) {
+                Ok(structure) => {
+                    let _ = spawn_structure_data(
+                        &mut commands,
+                        &structure,
+                        Transform::from(ev.transform.clone()),
+                        ev.parent,
+                    );
+                }
+                Err(e) => {
+                    eprintln!("[InPass] Import error: {:?}", e);
+                }
+            }
+        } else {
+            rest.push(ev);
+        }
+    }
+    pending.0 = rest;
+    if any_spawned { activity.idle_frames = 0; }
+}
+
+// Collects all computed world-space paths for debug drawing
+#[derive(Resource, Default)]
+pub struct AllPathsDebug {
+    pub paths: Vec<Vec<Vec3>>, // list of polylines
+}
+
+// --- Generation pass tracking ---
+#[derive(Resource, Default, Clone, Copy)]
+pub struct CurrentPass(pub u8);
+
+// Highest pass index seen in authored data so far. Total passes = HighestPassIndex + 1
+#[derive(Resource, Default, Clone, Copy)]
+pub struct HighestPassIndex(pub u8);
+
+pub fn rand_dist_dir_spawn_listener(
+    mut commands: Commands,
+    mut reader: EventReader<RandDistDirSpawnEvent>,
+    mut gen_rng: ResMut<GenRng>,
+    mut activity: ResMut<SpawnActivity>,
+) {
+    let mut processed = false;
+    for event in reader.read() {
+        processed = true;
+        // Sample angle in degrees and distance uniformly
+        let angle_deg = gen_rng.rng_mut().gen_range(event.angle_min_deg..=event.angle_max_deg);
+        let angle_rad = angle_deg.to_radians();
+        let dist = gen_rng.rng_mut().gen_range(event.dist_min..=event.dist_max);
+        let offset = Vec3::new(angle_rad.cos() * dist, event.y, angle_rad.sin() * dist);
+        println!(
+            "[RandDistDir] angle_deg={:.2}, dist={:.2}, offset={:?}",
+            angle_deg, dist, offset
+        );
+
+        // Apply offset relative to the provided base transform
+        let mut euler = event.transform.clone();
+        euler.translation = (
+            euler.translation.0 + offset.x,
+            euler.translation.1 + offset.y,
+            euler.translation.2 + offset.z,
+        );
+
+        let reference = event.reference.clone();
+        let parent = event.parent;
+        commands.queue(move |world: &mut World| {
+            // Create a container for applying the base transform, then nest the offset child under it
+            // by reusing the Nest path: the child's local euler handles the offset.
+            world.send_event(NestSpawnEvent { reference, transform: euler, parent });
+        });
+    }
+    if processed { activity.idle_frames = 0; }
+}
+
+pub fn draw_all_paths_debug(
+    mut gizmos: Gizmos,
+    dbg: Res<AllPathsDebug>,
+) {
+    if dbg.paths.is_empty() { return; }
+    for poly in dbg.paths.iter() {
+        if poly.len() < 2 { continue; }
+        for w in poly.windows(2) {
+            let a = w[0];
+            let b = w[1];
+            gizmos.line(a, b, Color::srgba(1.0, 0.3, 0.1, 1.0));
+        }
+    }
+}
+
+pub fn path_to_tag_spawn_listener(
+    mut commands: Commands,
+    mut reader: EventReader<PathToTagSpawnEvent>,
+    tag_query: Query<(&GlobalTransform, &Tags)>,
+    nav_mesh: Option<Res<oxidized_navigation::NavMesh>>,
+    settings: Option<Res<oxidized_navigation::NavMeshSettings>>,
+    mut all_dbg: ResMut<AllPathsDebug>,
+    parent_query: Query<&GlobalTransform>,
+    mut activity: ResMut<SpawnActivity>,
+) {
+    let mut processed = false;
+    for event in reader.read() {
+        // Only mark processed when we actually succeed in producing a path
+        // Compute world-space base transform for this event: parent GlobalTransform * local Transform
+        let local_tf = Transform::from(event.transform.clone());
+        let world_tf = match event.parent.and_then(|p| parent_query.get(p).ok()) {
+            Some(parent_gt) => parent_gt.compute_transform() * local_tf,
+            None => local_tf,
+        };
+        let base = world_tf.translation;
+
+        // Find nearest entity with the requested tag
+        let mut best: Option<(Vec3, f32)> = None; // (position, dist2)
+        for (gt, tags) in tag_query.iter() {
+            if tags.0.iter().any(|t| t == &event.tag) {
+                let pos = gt.translation();
+                // Compare distances in world space; rotate local start by world rotation
+                let mut start_world = base + world_tf.rotation * event.start;
+                // Align Y to candidate's Y to improve polygon matching (door base may be elevated)
+                start_world.y = pos.y;
+                let d2 = pos.distance_squared(start_world);
+                if best.map(|(_, bd2)| d2 < bd2).unwrap_or(true) {
+                    best = Some((pos, d2));
+                }
+            }
+        }
+
+        let Some((end_pos, _)) = best else {
+            println!("[PathToTag] No entity found with tag '{}' yet; will retry next frame", event.tag);
+            let ev = event.clone();
+            commands.queue(move |world: &mut World| { world.send_event(ev); });
+            continue;
+        };
+
+        let (Some(nav_mesh), Some(settings)) = (nav_mesh.as_ref(), settings.as_ref()) else {
+            println!("[PathToTag] NavMesh/Settings not available yet; will retry next frame");
+            let ev = event.clone();
+            commands.queue(move |world: &mut World| { world.send_event(ev); });
+            continue;
+        };
+
+        // Compute path using oxidized_navigation (deterministic). If the initial start is not on the
+        // navmesh, probe a few nearby offsets on the horizontal plane to find a valid start polygon.
+        let mut path_points: Vec<Vec3> = Vec::new();
+        if let Ok(tiles) = nav_mesh.get().read() {
+            // Base start position rotated into world, then snapped near end's Y plane
+            let mut start_world = base + world_tf.rotation * event.start;
+            start_world.y = end_pos.y + 0.05;
+            println!("[PathToTag] Using start_world={:?}, end_pos={:?}", start_world, end_pos);
+
+            // Helper to compute a path between arbitrary points
+            let try_between = |s: Vec3, e: Vec3| -> Option<Vec<Vec3>> {
+                match oxidized_navigation::query::find_path(&tiles, &settings, s, e, None, None) {
+                    Ok(points) if points.len() >= 2 => Some(points),
+                    _ => None,
+                }
+            };
+
+            // Helper that also probes around the start point if direct path fails
+            let _try_between_with_probe = |s: Vec3, e: Vec3| -> Option<Vec<Vec3>> {
+                if let Some(p) = try_between(s, e) { return Some(p); }
+                let radii = [0.15f32, 0.3, 0.45, 0.6, 0.8, 1.0];
+                for r in radii.into_iter() {
+                    let steps = 16;
+                    for i in 0..steps {
+                        let theta = (i as f32) * std::f32::consts::TAU / (steps as f32);
+                        let cand = Vec3::new(s.x + r * theta.cos(), s.y, s.z + r * theta.sin());
+                        if let Some(p) = try_between(cand, e) { return Some(p); }
+                    }
+                }
+                None
+            };
+
+            // If author provided manual checkpoints, PREPEND them and then navmesh from the FINAL manual point -> end.
+            if let Some(local_points) = &event.manual_points {
+                // 1) Transform manual points to world and snap Y near navmesh plane
+                let mut world_manual: Vec<Vec3> = Vec::with_capacity(local_points.len());
+                for lp in local_points.iter() {
+                    let mut wp = base + world_tf.rotation * *lp;
+                    wp.y = end_pos.y + 0.05;
+                    world_manual.push(wp);
+                }
+
+                // 2) Determine navmesh start: last manual point (or start_world if list empty)
+                let nav_start = world_manual.last().copied().unwrap_or(start_world);
+
+                // 3) Compute base path from nav_start to end_pos (with probe fallback around nav_start)
+                let base_path = match try_between(nav_start, end_pos) {
+                    Some(p) => p,
+                    None => {
+                        // Probe around start if direct fails
+                        let radii = [0.15f32, 0.3, 0.45, 0.6, 0.8, 1.0];
+                        let mut found: Option<Vec<Vec3>> = None;
+                        'outer_bp: for r in radii.into_iter() {
+                            let steps = 16;
+                            for i in 0..steps {
+                                let theta = (i as f32) * std::f32::consts::TAU / (steps as f32);
+                                let cand = Vec3::new(nav_start.x + r * theta.cos(), nav_start.y, nav_start.z + r * theta.sin());
+                                if let Some(p) = try_between(cand, end_pos) { found = Some(p); break 'outer_bp; }
+                            }
+                        }
+                        match found {
+                            Some(p) => p,
+                            None => {
+                                println!("[PathToTag] Base path failed with manual_points; will retry next frame");
+                                let ev = event.clone();
+                                commands.queue(move |world: &mut World| { world.send_event(ev); });
+                                continue;
+                            }
+                        }
+                    }
+                };
+
+                // 4) Prepend: start_world + manual_points + base_path (skip base_path[0] which equals nav_start)
+                path_points.clear();
+                path_points.push(start_world);
+                path_points.extend(world_manual.into_iter());
+                if base_path.len() > 1 { path_points.extend_from_slice(&base_path[1..]); }
+            } else {
+                // No manual checkpoints: attempt direct path, then probe start if needed
+                if let Some(points) = try_between(start_world, end_pos) {
+                    println!(
+                        "[PathToTag] Computed path ({} pts) from {:?} to {:?}",
+                        points.len(), start_world, end_pos
+                    );
+                    println!("[PathToTag] Points: {:?}", points);
+                    path_points = points;
+                } else {
+                    // Probe around start
+                    let radii = [0.15f32, 0.3, 0.45, 0.6, 0.8, 1.0];
+                    let mut found = None;
+                    'outer: for r in radii.into_iter() {
+                        let steps = 16; // 22.5-degree steps
+                        for i in 0..steps {
+                            let theta = (i as f32) * std::f32::consts::TAU / (steps as f32);
+                            let cand = Vec3::new(start_world.x + r * theta.cos(), start_world.y, start_world.z + r * theta.sin());
+                            if let Some(points) = try_between(cand, end_pos) {
+                                println!("[PathToTag] Probed start at r={:.2}, theta={:.2} -> valid", r, theta);
+                                found = Some(points);
+                                break 'outer;
+                            }
+                        }
+                    }
+                    if let Some(points) = found {
+                        println!("[PathToTag] Probing succeeded; path points: {:?}", points);
+                        path_points = points;
+                    } else {
+                        println!("[PathToTag] NoValidStartPolygon near start; will retry next frame");
+                        let ev = event.clone();
+                        commands.queue(move |world: &mut World| { world.send_event(ev); });
+                    }
+                }
+            }
+
+            // Optional wobble: apply starting AT the last manual point (index = manual_points.len())
+            // This ensures even a single remaining segment (2-point base path) gets wobble applied.
+            let wobble_prefix_len: usize = match &event.manual_points { Some(lps) => lps.len(), None => 0 };
+                if let Some(wob) = event.wobble.as_ref() {
+                    if path_points.len() >= 2 && wob.checkpoint_spacing > 0.01 && wob.wavelength > 0.01 {
+                        // Precompute segment lengths and cumulative arclengths
+                        let mut seg_lengths: Vec<f32> = Vec::with_capacity(path_points.len() - 1);
+                        let mut cum: Vec<f32> = Vec::with_capacity(path_points.len());
+                        cum.push(0.0);
+                        for w in path_points.windows(2) {
+                            let l = w[1].distance(w[0]);
+                            seg_lengths.push(l);
+                            cum.push(cum.last().copied().unwrap_or(0.0) + l);
+                        }
+
+                        let total_len = *cum.last().unwrap_or(&0.0);
+                        // If wobble starts after a prefix (manual points), compute s_start at that index
+                        let s_start = if wobble_prefix_len < cum.len() { cum[wobble_prefix_len] } else { 0.0 };
+                        // If prefix covers the entire path, skip wobble; otherwise proceed (even for a single remaining segment)
+                        if wobble_prefix_len >= path_points.len() { /* no remainder to wobble */ }
+                        else {
+                        // Helper to sample point and a robust horizontal tangent at arclength s
+                        let sample_at = |s: f32| -> (Vec3, Vec3) {
+                            let mut s_rem = s.clamp(0.0, total_len);
+                            for (i, &l) in seg_lengths.iter().enumerate() {
+                                if l <= 1e-5 { continue; }
+                                if s_rem <= l {
+                                    let t = s_rem / l;
+                                    let p0 = path_points[i];
+                                    let p1 = path_points[i+1];
+                                    let pos = p0.lerp(p1, t);
+                                    // Base tangent on current segment
+                                    let mut tan = p1 - p0;
+                                    // Project to XZ plane for lateral computation
+                                    tan.y = 0.0;
+                                    let mut tan = tan.normalize_or_zero();
+                                    // If this segment has negligible horizontal direction (e.g., vertical),
+                                    // fall back to a nearby segment with horizontal movement.
+                                    if tan.length_squared() < 1.0e-8 {
+                                        // Try previous segment
+                                        if i > 0 {
+                                            let mut prev = path_points[i] - path_points[i-1];
+                                            prev.y = 0.0;
+                                            tan = prev.normalize_or_zero();
+                                        }
+                                        // If still degenerate, try next-next segment
+                                        if tan.length_squared() < 1.0e-8 && i + 2 < path_points.len() {
+                                            let mut next2 = path_points[i+2] - path_points[i+1];
+                                            next2.y = 0.0;
+                                            tan = next2.normalize_or_zero();
+                                        }
+                                        // Final fallback: global X
+                                        if tan.length_squared() < 1.0e-8 { tan = Vec3::X; }
+                                    }
+                                    return (pos, tan);
+                                }
+                                s_rem -= l;
+                            }
+                            // Fallback to end
+                            let last = path_points.last().copied().unwrap();
+                            let prev = path_points[path_points.len()-2];
+                            let mut tan = last - prev;
+                            tan.y = 0.0;
+                            tan = tan.normalize_or_zero();
+                            if tan.length_squared() < 1.0e-8 {
+                                // Scan backwards for any horizontal movement
+                                for w in path_points.windows(2).rev() {
+                                    let mut d = w[1] - w[0];
+                                    d.y = 0.0;
+                                    tan = d.normalize_or_zero();
+                                    if tan.length_squared() >= 1.0e-8 { break; }
+                                }
+                                if tan.length_squared() < 1.0e-8 { tan = Vec3::X; }
+                            }
+                            (last, tan)
+                        };
+
+                        // Attempt wobble up to 3 times, halving amplitude on failure
+                        let mut amp = wob.amplitude;
+                        let mut applied = false;
+                        for _attempt in 0..3 {
+                            // Build checkpoints: start at the first post-prefix point, then wobble offsets -> end
+                            let mut checkpoints: Vec<Vec3> = Vec::new();
+                            // initial checkpoint is the first point after the preserved prefix
+                            checkpoints.push(path_points[wobble_prefix_len]);
+                            let mut s = (s_start + wob.checkpoint_spacing).min(total_len);
+                            let mut made_offset = false;
+                            // Place offsets at regular spacing all the way up to just before the end
+                            while s < total_len - 1.0e-3 {
+                                let (base_p, tan) = sample_at(s);
+                                let side = Vec3::Y.cross(tan).normalize_or_zero();
+                                let offset = amp * (std::f32::consts::TAU * s / wob.wavelength + wob.phase).sin();
+                                let mut cp = base_p + side * offset;
+                                // Keep Y on base path height
+                                cp.y = base_p.y;
+                                checkpoints.push(cp);
+                                made_offset = true;
+                                s += wob.checkpoint_spacing;
+                            }
+                            // If remainder was too short for the loop above, place one offset at the midpoint of the remainder
+                            if !made_offset {
+                                let mid = (s_start + total_len) * 0.5;
+                                if mid > s_start + 1e-4 && mid < total_len - 1e-4 {
+                                    let (base_p, tan) = sample_at(mid);
+                                    let side = Vec3::Y.cross(tan).normalize_or_zero();
+                                    let offset = amp * (std::f32::consts::TAU * mid / wob.wavelength + wob.phase).sin();
+                                    let mut cp = base_p + side * offset;
+                                    cp.y = base_p.y;
+                                    checkpoints.push(cp);
+                                }
+                            }
+                            // No artificial pre-end checkpoint: sampling above runs to near total_len
+                            // Always include the end point as the final checkpoint
+                            checkpoints.push(path_points.last().copied().unwrap());
+
+                            // Now pathfind through each consecutive pair of checkpoints
+                            // Start with the preserved prefix (including the junction point)
+                            let mut new_path: Vec<Vec3> = Vec::new();
+                            if wobble_prefix_len > 0 {
+                                new_path.extend_from_slice(&path_points[..=wobble_prefix_len]);
+                            } else {
+                                new_path.push(path_points[0]);
+                            }
+                            let mut ok = true;
+                            for w in checkpoints.windows(2) {
+                                match oxidized_navigation::query::find_path(&tiles, &settings, w[0], w[1], None, None) {
+                                    Ok(sub) if sub.len() >= 2 => {
+                                        // Avoid duplicating the junction point
+                                        new_path.extend_from_slice(&sub[1..]);
+                                    }
+                                    _ => { ok = false; break; }
+                                }
+                            }
+
+                            if ok && new_path.len() >= 2 {
+                                println!("[PathToTag][Wobble] Applied wobble (amp={:.2}) with {} checkpoints -> {} pts", amp, checkpoints.len(), new_path.len());
+                                path_points = new_path;
+                                applied = true;
+                                break;
+                            } else {
+                                amp *= 0.5;
+                            }
+                        }
+                        if !applied {
+                            println!("[PathToTag][Wobble] Failed to apply wobble after retries; using base path");
+                        }
+                        }
+                    }
+                }
+        }
+
+        if path_points.len() < 2 { continue; }
+
+        // Store world-space path for global debug
+        all_dbg.paths.push(path_points.clone());
+        if all_dbg.paths.len() > 256 { all_dbg.paths.remove(0); }
+
+        // Convert world-space points to the container's local space using the full inverse transform
+        // (accounts for rotation and scale, not just translation)
+        let inv_world = world_tf.compute_matrix().inverse();
+        let local_points: Vec<Vec3> = path_points
+            .iter()
+            .map(|p| inv_world.transform_point3(*p))
+            .collect();
+
+        // Forward to PathSpawnEvent so existing logic handles instantiation and sampling
+        let reference = event.reference.clone();
+        let tension = event.tension;
+        let spread = event.spread.clone();
+        let count = event.count;
+        let transform = event.transform.clone();
+        let parent = event.parent;
+        commands.queue(move |world: &mut World| {
+            world.send_event(PathSpawnEvent { reference, points: local_points, tension, spread, count, transform, parent });
+        });
+        processed = true;
+    }
+    if processed { activity.idle_frames = 0; }
+}
+
 // A single driver that manages all GenerationState transitions
 pub fn generation_state_driver(
     state: Res<State<GenerationState>>,
@@ -54,6 +528,14 @@ pub fn generation_state_driver(
             if any_pending {
                 stability.no_pending_stable_frames = 0;
                 arming.spawn_done_frames = 0;
+                if generating_frames.frames_in_generating % 30 == 0 {
+                    let gen_cnt = gen_only_pending.iter().count();
+                    let sel_cnt = selective_pending.iter().count();
+                    println!(
+                        "[GenState][Generating] pending: gen_only={} selective={} (holding)",
+                        gen_cnt, sel_cnt
+                    );
+                }
                 return;
             } else {
                 stability.no_pending_stable_frames = stability.no_pending_stable_frames.saturating_add(1);
@@ -78,13 +560,24 @@ pub fn generation_state_driver(
                 }
             } else {
                 arming.spawn_done_frames = 0;
+                if generating_frames.frames_in_generating % 30 == 0 {
+                    println!(
+                        "[GenState][Generating] waiting: frames={} stable_frames={} idle_frames={} (need >= {}, {}, {})",
+                        generating_frames.frames_in_generating,
+                        stability.no_pending_stable_frames,
+                        activity.idle_frames,
+                        MIN_GENERATING_FRAMES,
+                        REQUIRED_STABLE_FRAMES,
+                        REQUIRED_IDLE_FRAMES
+                    );
+                }
             }
         }
         GenerationState::CollisionResolution => {
             // increment and move on after N frames
             timer.frames = timer.frames.saturating_add(1);
             if timer.frames > 60 {
-                info!("[GenState] CollisionResolution -> NavMeshBuilding");
+                println!("[GenState] CollisionResolution -> NavMeshBuilding");
                 next.set(GenerationState::NavMeshBuilding);
                 timer.frames = 0;
             }
@@ -96,7 +589,7 @@ pub fn generation_state_driver(
                 None => true,
             };
             if done {
-                info!("[GenState] NavMeshBuilding -> Completed");
+                println!("[GenState] NavMeshBuilding -> Completed");
                 next.set(GenerationState::Completed);
             }
         }
@@ -109,10 +602,12 @@ pub fn reset_generating_phase(
     mut stability: ResMut<SpawningStability>,
     mut gen_counter: ResMut<GeneratingFrameCounter>,
     mut activity: ResMut<SpawnActivity>,
+    mut arming: ResMut<GenerationAdvanceArming>,
 ) {
     stability.no_pending_stable_frames = 0;
     gen_counter.frames_in_generating = 0;
     activity.idle_frames = 0;
+    arming.spawn_done_frames = 0;
 }
 
 
@@ -164,6 +659,8 @@ pub fn spawn_generation_state_overlay(mut commands: Commands) {
 pub fn update_generation_state_overlay(
     state: Option<Res<State<GenerationState>>>,
     active_tasks: Option<Res<oxidized_navigation::ActiveGenerationTasks>>,
+    cur_pass: Option<Res<CurrentPass>>,
+    highest_pass: Option<Res<HighestPassIndex>>,
     mut q: Query<&mut Text, With<GenStateOverlay>>,
 ) {
     let mut text = match q.get_single_mut() {
@@ -172,7 +669,9 @@ pub fn update_generation_state_overlay(
     };
     let gs = state.as_ref().map(|s| s.get()).cloned().unwrap_or(GenerationState::Generating);
     let tasks = active_tasks.map(|t| t.len()).unwrap_or(0);
-    text.0 = format!("GenerationState: {:?}\nActiveNavMeshTasks: {}", gs, tasks);
+    let cp = cur_pass.map(|p| p.0).unwrap_or(0);
+    let hp = highest_pass.map(|p| p.0).unwrap_or(0);
+    text.0 = format!("GenerationState: {:?}\nActiveNavMeshTasks: {}\nPass: {}/{}", gs, tasks, cp + 1, hp + 1);
 }
 
 // High-level generation/state-of-world progression
@@ -359,8 +858,23 @@ pub fn navmesh_build_monitor(
         None => true,
     };
     if done {
-        info!("[GenState] NavMeshBuilding -> Completed");
+        println!("[GenState] NavMeshBuilding -> Completed");
         next.set(GenerationState::Completed);
+    }
+}
+
+// On entering Completed, either advance to the next pass (if any), or remain Completed
+pub fn advance_pass_or_finish(
+    mut next: ResMut<NextState<GenerationState>>,
+    mut cur: ResMut<CurrentPass>,
+    highest: Res<HighestPassIndex>,
+) {
+    if cur.0 < highest.0 {
+        cur.0 = cur.0.saturating_add(1);
+        println!("[Pass] Advancing to pass {}", cur.0 + 1);
+        next.set(GenerationState::Generating);
+    } else {
+        println!("[Pass] Final pass reached: {}", cur.0 + 1);
     }
 }
 
@@ -736,6 +1250,7 @@ pub fn nest_spawn_listener(
                 let container = commands
                     .spawn_empty()
                     .insert(Transform::from(event.transform.clone()))
+                    .insert(GlobalTransform::default())
                     .insert(InheritedVisibility::default())
                     .insert(Name::new(structure.structure_name.clone()))
                     .id();
@@ -838,6 +1353,12 @@ pub fn rand_spawn_listener(
     for event in reader.read() {
         processed = true;
         let jiggled = jiggle_transform(&mut gen_rng, event.rand.clone(), event.transform.clone());
+        info!(
+            "[RandJiggle] t=({:.3},{:.3},{:.3}) r=({:.1},{:.1},{:.1}) s=({:.2},{:.2},{:.2})",
+            jiggled.translation.0, jiggled.translation.1, jiggled.translation.2,
+            jiggled.rotation.0, jiggled.rotation.1, jiggled.rotation.2,
+            jiggled.scale.0, jiggled.scale.1, jiggled.scale.2
+        );
         let reference = event.reference.clone();
         let parent = event.parent;
         commands.queue(move |world: &mut World| {
@@ -1049,15 +1570,77 @@ pub fn path_spawn_listener(
             SpreadData::Regular => {
                 curve.unwrap().iter_positions(event.count as usize).collect()
             }
+            SpreadData::Constant(spacing) => {
+                // Even spacing along the ORIGINAL polyline (event.points), inclusive of endpoints
+                let pts = &event.points;
+                if pts.len() < 2 {
+                    pts.clone()
+                } else {
+                    let mut seg_lengths: Vec<f32> = Vec::with_capacity(pts.len() - 1);
+                    let mut cum: Vec<f32> = Vec::with_capacity(pts.len());
+                    cum.push(0.0);
+                    for w in pts.windows(2) {
+                        let l = w[1].distance(w[0]);
+                        seg_lengths.push(l);
+                        cum.push(cum.last().copied().unwrap_or(0.0) + l);
+                    }
+                    let total_len = *cum.last().unwrap_or(&0.0);
+                    let step = spacing.max(0.001);
+
+                    // Helper to sample along the polyline at arclength s
+                    let sample_at = |s: f32| -> Vec3 {
+                        let mut s_rem = s.clamp(0.0, total_len);
+                        for (i, &l) in seg_lengths.iter().enumerate() {
+                            if l <= 1e-6 { continue; }
+                            if s_rem <= l {
+                                let t = s_rem / l;
+                                return pts[i].lerp(pts[i+1], t);
+                            }
+                            s_rem -= l;
+                        }
+                        *pts.last().unwrap()
+                    };
+
+                    let mut out: Vec<Vec3> = Vec::new();
+                    let mut s = 0.0;
+                    while s + 1.0e-4 < total_len {
+                        out.push(sample_at(s));
+                        s += step;
+                    }
+                    // Include the endpoint only if there's at least one full spacing remaining
+                    let last_s = if out.is_empty() { 0.0 } else { (s - step).max(0.0) };
+                    let remainder = total_len - last_s;
+                    if remainder + 1.0e-4 >= step {
+                        out.push(*pts.last().unwrap());
+                    }
+                    out
+                }
+            }
             _ => {
                 panic!("This spread type not supported yet!");
             }
         };
+        // Compute simple tangents using neighboring points (forward differences at ends)
+        let n = positions.len();
+        let mut tangents: Vec<Vec3> = Vec::with_capacity(n);
+        for i in 0..n {
+            let prev = if i > 0 { positions[i - 1] } else { positions[i] };
+            let next = if i + 1 < n { positions[i + 1] } else { positions[i] };
+            let mut t = next - prev;
+            // Use horizontal tangent for yaw alignment
+            t.y = 0.0;
+            let mut t = t.normalize_or_zero();
+            if t.length_squared() < 1.0e-6 { t = Vec3::Z; }
+            tangents.push(t);
+        }
 
-        for point in positions.into_iter() {
+        for (point, tan) in positions.into_iter().zip(tangents.into_iter()) {
+            // Yaw so +Z faces along the tangent
+            let yaw_rad = tan.x.atan2(tan.z);
+            let yaw_deg = yaw_rad.to_degrees();
             let euler = EulerTransform {
                 translation: (point.x, point.y, point.z),
-                rotation: (0.0, 0.0, 0.0),
+                rotation: (0.0, yaw_deg, 0.0),
                 scale: (1.0, 1.0, 1.0),
             };
 

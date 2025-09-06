@@ -5,7 +5,14 @@ use proc_gen::spawning::euler_transform::EulerTransform;
 use proc_gen::spawn;
 use proc_gen::event_system::spawn_events::*;
 use bevy::prelude::*;
-use proc_gen::event_system::event_listeners::{GenerationState, CollisionResolutionTimer};
+use proc_gen::event_system::event_listeners::{
+    GenerationState,
+    CollisionResolutionTimer,
+    CurrentPass,
+    HighestPassIndex,
+    PendingInPass,
+    AllPathsDebug,
+};
 use proc_gen::spawning::helpers::GenRng;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -63,6 +70,11 @@ pub(crate) fn reset_on_space(
     roots: Query<Entity, With<GeneratedRoot>>,
     mut next_state: ResMut<NextState<GenerationState>>,
     mut collision_timer: ResMut<CollisionResolutionTimer>,
+    // Generation pass resetting
+    mut cur_pass: ResMut<CurrentPass>,
+    mut highest_pass: ResMut<HighestPassIndex>,
+    mut pending_inpass: ResMut<PendingInPass>,
+    mut paths_dbg: ResMut<AllPathsDebug>,
 ) {
     if !keys.just_pressed(KeyCode::Space) { return; }
 
@@ -89,5 +101,11 @@ pub(crate) fn reset_on_space(
 
     // Reset generation pipeline state so it runs again
     collision_timer.frames = 0;
+    // Reset pass state and pending deferrals; HighestPassIndex will be raised by authored InPass keys
+    cur_pass.0 = 0;
+    highest_pass.0 = 0;
+    pending_inpass.0.clear();
+    // Clear accumulated path debug lines
+    paths_dbg.paths.clear();
     next_state.set(GenerationState::Generating);
 }

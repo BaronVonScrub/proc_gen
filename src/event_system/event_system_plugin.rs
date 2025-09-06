@@ -14,6 +14,10 @@ impl Plugin for EventSystemPlugin {
         app.init_resource::<GeneratingFrameCounter>();
         app.init_resource::<SpawnActivity>();
         app.init_resource::<GenerationAdvanceArming>();
+        app.init_resource::<AllPathsDebug>();
+        app.init_resource::<CurrentPass>();
+        app.init_resource::<HighestPassIndex>();
+        app.init_resource::<PendingInPass>();
         app.init_state::<GenerationState>();
         // Registering all events
         app.add_event::<MeshSpawnEvent>()
@@ -30,13 +34,16 @@ impl Plugin for EventSystemPlugin {
             .add_event::<ChooseSpawnEvent>()
             .add_event::<ChooseSomeSpawnEvent>()
             .add_event::<RandSpawnEvent>()
+            .add_event::<RandDistDirSpawnEvent>()
             .add_event::<ProbabilitySpawnEvent>()
             .add_event::<LoopSpawnEvent>()
             .add_event::<NestingLoopSpawnEvent>()
             .add_event::<NoiseSpawnEvent>()
             .add_event::<PathSpawnEvent>()
+            .add_event::<PathToTagSpawnEvent>()
             .add_event::<ReflectionSpawnEvent>()
             .add_event::<SelectiveReplacementSpawnEvent>();
+        app.add_event::<InPassSpawnEvent>();
 
         // Registering event handling systems (only needed during Generating)
         app.add_systems(Update, (
@@ -55,6 +62,8 @@ impl Plugin for EventSystemPlugin {
 
         // UI overlay update (always on)
         app.add_systems(Update, update_generation_state_overlay);
+        // Always draw accumulated path debug gizmos
+        app.add_systems(Update, draw_all_paths_debug);
 
         // Generation-time systems only
         app.add_systems(Update, (
@@ -62,18 +71,29 @@ impl Plugin for EventSystemPlugin {
             tick_spawn_activity,
             choose_spawn_listener,
             choose_some_spawn_listener,
+            in_pass_spawn_listener,
+            process_pending_inpass,
             rand_spawn_listener,
+            rand_dist_dir_spawn_listener,
             probability_spawn_listener,
             loop_spawn_listener,
             nesting_loop_spawn_listener,
             noise_spawn_listener,
             path_spawn_listener,
+            // Safe to run in Generating now: it only marks activity when a path actually resolves
+            path_to_tag_spawn_listener,
             reflection_spawn_listener,
             selective_replacement_spawn_listener,
             collider_priority_despawn_system,
             // Tick generating frame counter while in Generating state
             tick_generating_counter,
         ).run_if(in_state(GenerationState::Generating)));
+
+        // Post-generation path processing: once navmesh is available, these can resolve
+        app.add_systems(Update, (
+            path_to_tag_spawn_listener,
+            path_spawn_listener,
+        ).run_if(in_state(GenerationState::Completed)));
 
         // Single state driver for all GenerationState transitions (always scheduled)
         app.add_systems(Update, generation_state_driver);
@@ -89,6 +109,8 @@ impl Plugin for EventSystemPlugin {
         app.add_systems(OnEnter(GenerationState::NavMeshBuilding), activate_navmesh_affectors);
         // On entering Generating, reset counters
         app.add_systems(OnEnter(GenerationState::Generating), reset_generating_phase);
+        // On entering Completed, advance pass if more passes exist
+        app.add_systems(OnEnter(GenerationState::Completed), advance_pass_or_finish);
         app.add_systems(Startup, spawn_generation_state_overlay);
 
     }

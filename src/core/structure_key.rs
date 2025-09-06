@@ -11,6 +11,7 @@ use crate::core::rand_data::RandData;
 use crate::core::sample_size::SampleSize;
 use crate::core::spread_data::SpreadData;
 use crate::core::structure_reference::StructureReference;
+use crate::core::wobble::WobbleParams;
 use crate::event_system::spawn_events::*;
 use crate::management::structure_management::import_structure;
 use crate::spawning::euler_transform::EulerTransform;
@@ -55,6 +56,10 @@ pub enum StructureKey {
         reference: StructureReference,
         probability: f32,
     },
+    InPass {
+        index: u8,
+        reference: StructureReference,
+    },
     Loop {
         reference: StructureReference,
         shift_transform: EulerTransform,
@@ -80,6 +85,24 @@ pub enum StructureKey {
         tension: f32,
         spread: SpreadData,
         count: u32,
+    },
+    PathToTag {
+        reference: StructureReference,
+        start: Vec3,
+        manual_points: Option<Vec<Vec3>>, // optional local-space control points
+        tag: String,
+        tension: f32,
+        spread: SpreadData,
+        count: u32,
+        wobble: Option<WobbleParams>,
+    },
+    RandDistDir {
+        reference: StructureReference,
+        dist_min: f32,
+        dist_max: f32,
+        angle_min_deg: f32,
+        angle_max_deg: f32,
+        y: f32,
     },
     Reflection {
         reference: StructureReference,
@@ -138,9 +161,17 @@ impl StructureKey {
                 StructureReference::Raw { structure, .. } => format!("Path {:?}", structure.structure_name.clone()),
                 StructureReference::Ref { structure, .. } => format!("Path {:?}", structure.clone()),
             },
+            StructureKey::PathToTag { reference, tag, .. } => match reference {
+                StructureReference::Raw { structure, .. } => format!("PathToTag {} -> {:?}", tag, structure.structure_name.clone()),
+                StructureReference::Ref { structure, .. } => format!("PathToTag {} -> {:?}", tag, structure.clone()),
+            },
             StructureKey::Reflection { reference, .. } => match reference {
                 StructureReference::Raw { structure, .. } => format!("Reflect {:?}", structure.structure_name.clone()),
                 StructureReference::Ref { structure, .. } => format!("Reflect {:?}", structure.clone()),
+            },
+            StructureKey::RandDistDir { reference, .. } => match reference {
+                StructureReference::Raw { structure, .. } => format!("RandDistDir {:?}", structure.structure_name.clone()),
+                StructureReference::Ref { structure, .. } => format!("RandDistDir {:?}", structure.clone()),
             },
             StructureKey::NestingLoop { reference, .. } => match reference {
                 StructureReference::Raw { structure, .. } => format!("NLoop {:?}", structure.structure_name.clone()),
@@ -149,6 +180,10 @@ impl StructureKey {
             StructureKey::SelectiveReplacement { initial_reference, .. } => match initial_reference {
                 StructureReference::Raw { structure, .. } => format!("SelectiveReplacement {:?}", structure.structure_name.clone()),
                 StructureReference::Ref { structure, .. } => format!("SelectiveReplacement {:?}", structure.clone()),
+            },
+            StructureKey::InPass { index, reference } => match reference {
+                StructureReference::Raw { structure, .. } => format!("Pass{} {:?}", index, structure.structure_name.clone()),
+                StructureReference::Ref { structure, .. } => format!("Pass{} {:?}", index, structure.clone()),
             },
         }
     }
@@ -160,11 +195,14 @@ impl StructureKey {
             StructureKey::ChooseSome { list, .. } => Self::extract_tags(list),
             StructureKey::Rand { reference, .. } => Self::extract_tags(reference),
             StructureKey::ProbabilitySpawn { reference, .. } => Self::extract_tags(reference),
+            StructureKey::InPass { reference, .. } => Self::extract_tags(reference),
             StructureKey::Loop { reference, .. } => Self::extract_tags(reference),
             StructureKey::NestingLoop { reference, .. } => Self::extract_tags(reference),
             StructureKey::NoiseSpawn { reference, .. } => Self::extract_tags(reference),
             StructureKey::PathSpawn { reference, .. } => Self::extract_tags(reference),
+            StructureKey::PathToTag { reference, .. } => Self::extract_tags(reference),
             StructureKey::Reflection { reference, .. } => Self::extract_tags(reference),
+            StructureKey::RandDistDir { reference, .. } => Self::extract_tags(reference),
             _ => Vec::new(), // Other variants do not contain a StructureReference
         };
 
@@ -279,12 +317,45 @@ impl StructureKey {
                         parent,
                     });
                 }
+                StructureKey::PathToTag { reference, start, manual_points, tag, tension, spread, count, wobble } => {
+                    world.send_event(PathToTagSpawnEvent {
+                        reference,
+                        start,
+                        manual_points,
+                        tag,
+                        tension,
+                        spread,
+                        count,
+                        wobble,
+                        transform,
+                        parent,
+                    });
+                }
                 StructureKey::Reflection { reference, reflection_plane, reflection_point, reflect_child } => {
                     world.send_event(ReflectionSpawnEvent {
                         reference,
                         reflection_plane,
                         reflection_point,
                         reflect_child,
+                        transform,
+                        parent,
+                    });
+                }
+                StructureKey::InPass { index, reference } => {
+                    world.send_event(InPassSpawnEvent { index, reference, transform, parent });
+                }
+                StructureKey::RandDistDir { reference, dist_min, dist_max, angle_min_deg, angle_max_deg, y } => {
+                    println!(
+                        "[StructureKey::dispatch_event] Emitting RandDistDir: dist=[{:.2},{:.2}] angle=[{:.1},{:.1}] y={:.2}",
+                        dist_min, dist_max, angle_min_deg, angle_max_deg, y
+                    );
+                    world.send_event(RandDistDirSpawnEvent {
+                        reference,
+                        dist_min,
+                        dist_max,
+                        angle_min_deg,
+                        angle_max_deg,
+                        y,
                         transform,
                         parent,
                     });
