@@ -2,18 +2,15 @@
 
 use bevy::prelude::*;
 use bevy::render::mesh::MeshAabb;
-use bevy_rapier3d::prelude::{ActiveEvents, Collider, RigidBody};
+use bevy_rapier3d::prelude::{ActiveCollisionTypes, ActiveEvents, CollisionEvent, Collider, ContactForceEvent, ContactForceEventThreshold, Damping, Dominance, LockedAxes, RigidBody, Sleeping};
 use oxidized_navigation::NavMeshAffector;
 use crate::event_system::spawn_events::*;
-use uuid::Uuid;
 use crate::core::tmaterial::TMaterial;
 use crate::serialization::caching::MaterialCache;
 use std::path::Path;
-use bevy::prelude::*;
-use bevy_rapier3d::prelude::{ContactForceEventThreshold, Damping, Dominance, LockedAxes, Sleeping};
 use crate::spawning::object_logic::{ObjectType, Pathfinder, PathState, Selectable};
 use crate::core::structure_key::StructureKey;
-use crate::core::collider::ColliderBehaviour;
+use crate::core::collider::{ColliderBehaviour, ColliderPriority};
 use crate::spawning::helpers::*;
 use crate::spawning::light_spawning::{spawn_point_light, spawn_spot_light};
 use crate::core::components::MainCamera;
@@ -22,6 +19,214 @@ use crate::core::structure_reference::StructureReference;
 use crate::core::components::MainDirectionalLight;
 use crate::event_system::spawnables::structure::spawn_structure_data;
 use crate::core::tags::Tags;
+
+// Marker to indicate we've already stripped colliders for a GenerationOnlyCollider subtree
+#[derive(Component, Default)]
+pub struct GenerationOnlyCollidersStripped;
+// Tracks stabilization for GenerationOnlyCollider subtrees before stripping
+#[derive(Component, Default)]
+pub struct GenerationOnlyColliderPending {
+    pub last_descendant_count: usize,
+    pub last_collider_count: usize,
+    pub stable_frames: u8,
+}
+
+// A single driver that manages all GenerationState transitions
+pub fn generation_state_driver(
+    state: Res<State<GenerationState>>,
+    mut next: ResMut<NextState<GenerationState>>,
+    // For CollisionResolution phase
+    mut timer: ResMut<CollisionResolutionTimer>,
+    // For Generating readiness gating
+    gen_only_pending: Query<Entity, With<GenerationOnlyColliderPending>>,
+    selective_pending: Query<Entity, With<SelectiveReplacementPending>>,
+    mut stability: ResMut<SpawningStability>,
+    generating_frames: Res<GeneratingFrameCounter>,
+    activity: Res<SpawnActivity>,
+    mut arming: ResMut<GenerationAdvanceArming>,
+    // For NavMeshBuilding completion check
+    active_tasks: Option<Res<oxidized_navigation::ActiveGenerationTasks>>,
+) {
+    match *state.get() {
+        GenerationState::Generating => {
+            // Pending work check updates stability
+            let any_pending = !gen_only_pending.is_empty() || !selective_pending.is_empty();
+            if any_pending {
+                stability.no_pending_stable_frames = 0;
+                arming.spawn_done_frames = 0;
+                return;
+            } else {
+                stability.no_pending_stable_frames = stability.no_pending_stable_frames.saturating_add(1);
+            }
+
+            // Readiness thresholds
+            const MIN_GENERATING_FRAMES: u16 = 30;
+            const REQUIRED_STABLE_FRAMES: u8 = 20;
+            const REQUIRED_IDLE_FRAMES: u8 = 5;
+            let ready = generating_frames.frames_in_generating >= MIN_GENERATING_FRAMES
+                && stability.no_pending_stable_frames >= REQUIRED_STABLE_FRAMES
+                && activity.idle_frames >= REQUIRED_IDLE_FRAMES;
+
+            if ready {
+                // Debounce before advancing
+                arming.spawn_done_frames = arming.spawn_done_frames.saturating_add(1);
+                const REQUIRED_FRAMES: u8 = 5;
+                if arming.spawn_done_frames >= REQUIRED_FRAMES {
+                    info!("[GenState] Generating -> CollisionResolution");
+                    next.set(GenerationState::CollisionResolution);
+                    arming.spawn_done_frames = 0;
+                }
+            } else {
+                arming.spawn_done_frames = 0;
+            }
+        }
+        GenerationState::CollisionResolution => {
+            // increment and move on after N frames
+            timer.frames = timer.frames.saturating_add(1);
+            if timer.frames > 60 {
+                info!("[GenState] CollisionResolution -> NavMeshBuilding");
+                next.set(GenerationState::NavMeshBuilding);
+                timer.frames = 0;
+            }
+        }
+        GenerationState::NavMeshBuilding => {
+            // If the resource exists and is empty, we are done. If it doesn't exist, assume done.
+            let done = match active_tasks {
+                Some(tasks) => tasks.is_empty(),
+                None => true,
+            };
+            if done {
+                info!("[GenState] NavMeshBuilding -> Completed");
+                next.set(GenerationState::Completed);
+            }
+        }
+        GenerationState::Completed => {}
+    }
+}
+
+// On entering Generating, reset stability counters/flags
+pub fn reset_generating_phase(
+    mut stability: ResMut<SpawningStability>,
+    mut gen_counter: ResMut<GeneratingFrameCounter>,
+    mut activity: ResMut<SpawnActivity>,
+) {
+    stability.no_pending_stable_frames = 0;
+    gen_counter.frames_in_generating = 0;
+    activity.idle_frames = 0;
+}
+
+
+// While in Generating, tick the frame counter
+pub fn tick_generating_counter(
+    state: Option<Res<State<GenerationState>>>,
+    mut gen_counter: ResMut<GeneratingFrameCounter>,
+) {
+    if let Some(gs) = state {
+        if gs.get() == &GenerationState::Generating {
+            gen_counter.frames_in_generating = gen_counter.frames_in_generating.saturating_add(1);
+        }
+    }
+}
+
+// Increment spawn activity idle counter each frame
+pub fn tick_spawn_activity(mut activity: ResMut<SpawnActivity>) {
+    activity.idle_frames = activity.idle_frames.saturating_add(1);
+}
+
+// --- UI overlay for current GenerationState ---
+#[derive(Component)]
+pub struct GenStateOverlay;
+
+pub fn spawn_generation_state_overlay(mut commands: Commands) {
+    // Root node in top-left corner
+    let root = commands
+        .spawn_empty()
+        .insert(Node {
+            position_type: PositionType::Absolute,
+            left: Val::Px(8.0),
+            top: Val::Px(8.0),
+            ..Default::default()
+        })
+        .insert(BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.25)))
+        .insert(Name::new("GenStateOverlayRoot"))
+        .id();
+
+    commands.entity(root).with_children(|parent| {
+        parent
+            .spawn_empty()
+            .insert(Text::new("GenerationState: Initializing"))
+            .insert(TextFont { font_size: 16.0, ..Default::default() })
+            .insert(TextColor(Color::WHITE))
+            .insert(GenStateOverlay);
+    });
+}
+
+pub fn update_generation_state_overlay(
+    state: Option<Res<State<GenerationState>>>,
+    active_tasks: Option<Res<oxidized_navigation::ActiveGenerationTasks>>,
+    mut q: Query<&mut Text, With<GenStateOverlay>>,
+) {
+    let mut text = match q.get_single_mut() {
+        Ok(t) => t,
+        Err(_) => return,
+    };
+    let gs = state.as_ref().map(|s| s.get()).cloned().unwrap_or(GenerationState::Generating);
+    let tasks = active_tasks.map(|t| t.len()).unwrap_or(0);
+    text.0 = format!("GenerationState: {:?}\nActiveNavMeshTasks: {}", gs, tasks);
+}
+
+// High-level generation/state-of-world progression
+#[derive(States, Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash, Default)]
+pub enum GenerationState {
+    #[default]
+    Generating,
+    CollisionResolution,
+    NavMeshBuilding,
+    Completed,
+}
+
+// Simple frame counter used to wait during CollisionResolution
+#[derive(Resource, Default)]
+pub struct CollisionResolutionTimer {
+    pub frames: u16,
+}
+
+// Stability counters to avoid premature transition out of Generating
+#[derive(Resource, Default)]
+pub struct SpawningStability {
+    pub no_pending_stable_frames: u8,
+}
+
+#[derive(Resource, Default)]
+pub struct GeneratingFrameCounter {
+    pub frames_in_generating: u16,
+}
+
+// Threshold used to decide which colliders should influence the navmesh.
+// Any entity with ColliderPriority below this threshold will not receive
+// NavMeshAffector at activation time (allowing paths to ignore e.g. trees).
+#[derive(Resource, Clone, Copy)]
+pub struct NavMeshPriorityThreshold(pub i8);
+
+impl Default for NavMeshPriorityThreshold {
+    fn default() -> Self { NavMeshPriorityThreshold(1) }
+}
+
+// Debounce arming for transition from Generating -> CollisionResolution
+#[derive(Resource, Default)]
+pub struct GenerationAdvanceArming {
+    pub spawn_done_frames: u8,
+}
+
+// Marker used to delay adding NavMeshAffector until we're ready to build the navmesh
+#[derive(Component, Default)]
+pub struct QueuedNavMeshAffector;
+
+// Tracks whether spawn-related systems have been active recently
+#[derive(Resource, Default)]
+pub struct SpawnActivity {
+    pub idle_frames: u8,
+}
 use rand::prelude::IteratorRandom;
 use crate::spawning::helpers::GenRng;
 use bevy::ecs::world::World;
@@ -46,13 +251,184 @@ pub struct SelectiveReplacementPending {
     pub stable_frames: u8,
 }
 
+// Recursively collect an entity and all of its descendants
+fn collect_entity_and_descendants(entity: Entity, children_query: &Query<&Children>, out: &mut Vec<Entity>) {
+    out.push(entity);
+    if let Ok(children) = children_query.get(entity) {
+        for &child in children.iter() {
+            collect_entity_and_descendants(child, children_query, out);
+        }
+    }
+}
+
+// On entering NavMeshBuilding, convert all queued affectors to real NavMeshAffectors
+pub fn activate_navmesh_affectors(
+    mut commands: Commands,
+    queued: Query<(Entity, Option<&ColliderPriority>), With<QueuedNavMeshAffector>>,
+    threshold: Option<Res<NavMeshPriorityThreshold>>,
+) {
+    let thr = threshold.map(|t| t.0).unwrap_or(1);
+    for (e, pri_opt) in queued.iter() {
+        let include = match pri_opt { Some(ColliderPriority(p)) => *p >= thr, None => true };
+        if include {
+            commands.entity(e)
+                .insert(NavMeshAffector)
+                .remove::<QueuedNavMeshAffector>();
+        } else {
+            // Simply drop the queued flag so this collider does not affect the navmesh
+            commands.entity(e).remove::<QueuedNavMeshAffector>();
+        }
+    }
+}
+
+// (SpawningComplete resource and monitor removed; readiness is computed inline in
+//  advance_to_collision_resolution using pending queries and stability counters.)
+
+// When generation/deferred tasks are done, move from Generating -> CollisionResolution
+pub fn advance_to_collision_resolution(
+    state: Res<State<GenerationState>>,
+    gen_only_pending: Query<Entity, With<GenerationOnlyColliderPending>>,
+    selective_pending: Query<Entity, With<SelectiveReplacementPending>>,
+    mut stability: ResMut<SpawningStability>,
+    generating_frames: Res<GeneratingFrameCounter>,
+    activity: Res<SpawnActivity>,
+    mut arming: ResMut<GenerationAdvanceArming>,
+    mut next: ResMut<NextState<GenerationState>>,
+) {
+    if state.get() != &GenerationState::Generating { return; }
+
+    // Pending work check updates stability
+    let any_pending = !gen_only_pending.is_empty() || !selective_pending.is_empty();
+    if any_pending {
+        stability.no_pending_stable_frames = 0;
+        arming.spawn_done_frames = 0;
+        return;
+    } else {
+        stability.no_pending_stable_frames = stability.no_pending_stable_frames.saturating_add(1);
+    }
+
+    // Readiness thresholds
+    const MIN_GENERATING_FRAMES: u16 = 30;
+    const REQUIRED_STABLE_FRAMES: u8 = 20;
+    const REQUIRED_IDLE_FRAMES: u8 = 5;
+    let ready = generating_frames.frames_in_generating >= MIN_GENERATING_FRAMES
+        && stability.no_pending_stable_frames >= REQUIRED_STABLE_FRAMES
+        && activity.idle_frames >= REQUIRED_IDLE_FRAMES;
+
+    if ready {
+        // Debounce before advancing
+        arming.spawn_done_frames = arming.spawn_done_frames.saturating_add(1);
+        const REQUIRED_FRAMES: u8 = 5;
+        if arming.spawn_done_frames >= REQUIRED_FRAMES {
+            info!("[GenState] Generating -> CollisionResolution");
+            next.set(GenerationState::CollisionResolution);
+            arming.spawn_done_frames = 0;
+        }
+    } else {
+        arming.spawn_done_frames = 0;
+    }
+}
+
+// Wait a small number of frames to allow physics/colliders to settle
+pub fn collision_resolution_waiter(
+    state: Res<State<GenerationState>>,
+    mut timer: ResMut<CollisionResolutionTimer>,
+    mut next: ResMut<NextState<GenerationState>>,
+) {
+    if state.get() != &GenerationState::CollisionResolution { return; }
+    // increment and move on after N frames
+    timer.frames = timer.frames.saturating_add(1);
+    if timer.frames > 60 {
+        info!("[GenState] CollisionResolution -> NavMeshBuilding");
+        next.set(GenerationState::NavMeshBuilding);
+        // reset for potential reuse
+        timer.frames = 0;
+    }
+}
+
+// Monitor navmesh tile generation; when done move to Completed
+pub fn navmesh_build_monitor(
+    state: Res<State<GenerationState>>,
+    mut next: ResMut<NextState<GenerationState>>,
+    active_tasks: Option<Res<oxidized_navigation::ActiveGenerationTasks>>,
+) {
+    if state.get() != &GenerationState::NavMeshBuilding { return; }
+    // If the resource exists and is empty, we are done. If it doesn't exist, assume done.
+    let done = match active_tasks {
+        Some(tasks) => tasks.is_empty(),
+        None => true,
+    };
+    if done {
+        info!("[GenState] NavMeshBuilding -> Completed");
+        next.set(GenerationState::Completed);
+    }
+}
+
+// Enqueue pending processing for any root tagged GenerationOnlyCollider
+pub fn enqueue_generation_only_colliders(
+    mut commands: Commands,
+    tagged: Query<(Entity, &Tags), (Without<GenerationOnlyColliderPending>, Without<GenerationOnlyCollidersStripped>)>,
+) {
+    for (root, tags) in tagged.iter() {
+        if tags.contains("GenerationOnlyCollider") {
+            commands.entity(root).insert(GenerationOnlyColliderPending::default());
+        }
+    }
+}
+
+// Wait until the subtree stabilizes, then strip colliders under the tagged root
+pub fn strip_generation_only_colliders_progressor(
+    mut commands: Commands,
+    mut pending_q: Query<(Entity, &mut GenerationOnlyColliderPending, Option<&Name>)>,
+    children_query: Query<&Children>,
+    collider_query: Query<&Collider>,
+) {
+    for (root, mut pending, name_opt) in pending_q.iter_mut() {
+        let mut to_visit = Vec::new();
+        collect_entity_and_descendants(root, &children_query, &mut to_visit);
+        let descendant_count = to_visit.len();
+        let collider_count = to_visit.iter().filter(|&&e| collider_query.get(e).is_ok()).count();
+
+        if descendant_count == pending.last_descendant_count && collider_count == pending.last_collider_count {
+            pending.stable_frames = pending.stable_frames.saturating_add(1);
+        } else {
+            pending.stable_frames = 0;
+        }
+
+        pending.last_descendant_count = descendant_count;
+        pending.last_collider_count = collider_count;
+
+        if pending.stable_frames >= 3 {
+            let mut removed_count = 0usize;
+            for e in to_visit.iter().copied() {
+                if collider_query.get(e).is_ok() {
+                    commands.entity(e).remove::<Collider>();
+                    removed_count += 1;
+                }
+            }
+
+            info!(
+                "[GenOnlyCollider] Stripped {} Collider components under entity {:?} ({:?})",
+                removed_count, root, name_opt.map(|n| n.as_str().to_string())
+            );
+
+            commands.entity(root)
+                .insert(GenerationOnlyCollidersStripped)
+                .remove::<GenerationOnlyColliderPending>();
+        }
+    }
+}
+
 pub fn mesh_spawn_listener(
     mut commands: Commands,
     mut reader: EventReader<MeshSpawnEvent>,
     material_cache: Res<MaterialCache>,
     mut meshes: ResMut<Assets<Mesh>>,
+    mut activity: ResMut<SpawnActivity>,
 ) {
+    let mut processed = false;
     for event in reader.read() {
+        processed = true;
         let (material_name, adjusted_mesh) = match &event.material {
             TMaterial::BasicMaterial { material_name } => {
                 (material_name.clone(), event.mesh.clone()) // No tiling factor adjustment needed
@@ -89,8 +465,9 @@ pub fn mesh_spawn_listener(
                 .insert(Name::new("Mesh"))
                 .insert(Collider::cuboid(collider_size.x, collider_size.y, collider_size.z))
                 .insert(RigidBody::KinematicPositionBased)
-                .insert(ActiveEvents::CONTACT_FORCE_EVENTS)
-                .insert(NavMeshAffector)
+                .insert(ActiveEvents::COLLISION_EVENTS | ActiveEvents::CONTACT_FORCE_EVENTS)
+                .insert(ActiveCollisionTypes::all())
+                .insert(QueuedNavMeshAffector)
                 .insert(InheritedVisibility::default());
 
             // Set parent if applicable
@@ -101,14 +478,18 @@ pub fn mesh_spawn_listener(
             println!("Material not found: {}", material_name);
         }
     }
+    if processed { activity.idle_frames = 0; }
 }
 
 pub fn scene_spawn_listener(
     mut commands: Commands,
     mut reader: EventReader<SceneSpawnEvent>,
     asset_server: Res<AssetServer>,
+    mut activity: ResMut<SpawnActivity>,
 ) {
+    let mut processed = false;
     for event in reader.read() {
+        processed = true;
         let global_transform = Transform::from(event.transform.clone());
 
         let parent_entity = commands.spawn_empty()
@@ -144,9 +525,11 @@ pub fn scene_spawn_listener(
                     let mut entity_commands = commands.entity(parent_entity);
                     entity_commands.insert(collider)
                         .insert(Dominance::group(internal_collider.priority))
+                        .insert(ColliderPriority(internal_collider.priority))
                         .insert(Damping { linear_damping: 10.0, angular_damping: 0.0 })
                         .insert(LockedAxes::ROTATION_LOCKED | LockedAxes::TRANSLATION_LOCKED_Y)
-                        .insert(ActiveEvents::CONTACT_FORCE_EVENTS)
+                        .insert(ActiveEvents::COLLISION_EVENTS | ActiveEvents::CONTACT_FORCE_EVENTS)
+                        .insert(ActiveCollisionTypes::all())
                         .insert(Sleeping {
                             normalized_linear_threshold: 0.01,
                             angular_threshold: 0.01,
@@ -163,7 +546,7 @@ pub fn scene_spawn_listener(
                         }
                         ObjectType::Cosmetic => { /* Do nothing */ }
                         _ => {
-                            entity_commands.insert(NavMeshAffector);
+                            entity_commands.insert(QueuedNavMeshAffector);
                         }
                     }
 
@@ -184,13 +567,17 @@ pub fn scene_spawn_listener(
             commands.entity(parent_entity).set_parent(parent);
         }
     }
+    if processed { activity.idle_frames = 0; }
 }
 
 pub fn point_light_spawn_listener(
     mut commands: Commands,
     mut reader: EventReader<PointLightSpawnEvent>,
+    mut activity: ResMut<SpawnActivity>,
 ) {
+    let mut processed = false;
     for event in reader.read() {
+        processed = true;
         let entity = spawn_point_light(
             &mut commands,
             event.light.clone(),
@@ -200,13 +587,17 @@ pub fn point_light_spawn_listener(
             commands.entity(entity).set_parent(parent);
         }
     }
+    if processed { activity.idle_frames = 0; }
 }
 
 pub fn spot_light_spawn_listener(
     mut commands: Commands,
     mut reader: EventReader<SpotLightSpawnEvent>,
+    mut activity: ResMut<SpawnActivity>,
 ) {
+    let mut processed = false;
     for event in reader.read() {
+        processed = true;
         let entity = spawn_spot_light(
             &mut commands,
             event.light.clone(),
@@ -216,6 +607,7 @@ pub fn spot_light_spawn_listener(
             commands.entity(entity).set_parent(parent);
         }
     }
+    if processed { activity.idle_frames = 0; }
 }
 
 pub fn directional_light_spawn_listener(
@@ -223,8 +615,11 @@ pub fn directional_light_spawn_listener(
     mut reader: EventReader<DirectionalLightSpawnEvent>,
     existing: Query<Entity, With<MainDirectionalLight>>,
     parent_tags: Query<&Tags>,
+    mut activity: ResMut<SpawnActivity>,
 ) {
+    let mut processed = false;
     for event in reader.read() {
+        processed = true;
         // Determine if this should be the main world directional light
         let is_main = match event.parent {
             Some(parent) => parent_tags.get(parent).map(|t| t.contains("MainDirectionalLight")).unwrap_or(false),
@@ -263,58 +658,78 @@ pub fn directional_light_spawn_listener(
             if let Some(parent) = event.parent { commands.entity(parent).add_child(target); }
         }
     }
+    if processed { activity.idle_frames = 0; }
 }
 
 pub fn ambient_light_spawn_listener(
     mut reader: EventReader<AmbientLightSpawnEvent>,
     mut ambient: ResMut<AmbientLight>,
+    mut activity: ResMut<SpawnActivity>,
 ) {
+    let mut processed = false;
     for event in reader.read() {
+        processed = true;
         *ambient = event.light.clone();
     }
+    if processed { activity.idle_frames = 0; }
 }
 
 pub fn distance_fog_spawn_listener(
     mut reader: EventReader<DistanceFogSpawnEvent>,
     mut query: Query<&mut DistanceFog, With<MainCamera>>,
+    mut activity: ResMut<SpawnActivity>,
 ) {
+    let mut processed = false;
     for event in reader.read() {
+        processed = true;
         for mut fog in &mut query {
             *fog = event.fog.clone();
         }
     }
+    if processed { activity.idle_frames = 0; }
 }
 
 pub fn sound_effect_spawn_listener(
     mut reader: EventReader<SoundEffectSpawnEvent>,
     sfx: Res<AudioChannel<SoundEffects>>,
     asset_server: Res<AssetServer>,
+    mut activity: ResMut<SpawnActivity>,
 ) {
+    let mut processed = false;
     for event in reader.read() {
+        processed = true;
         let handle: Handle<AudioSource> = asset_server.load(event.file.as_str());
         // Play as a one-shot on the SFX channel
         sfx.play(handle);
     }
+    if processed { activity.idle_frames = 0; }
 }
 
 pub fn background_music_spawn_listener(
     mut reader: EventReader<BackgroundMusicSpawnEvent>,
     audio: Res<Audio>,
     asset_server: Res<AssetServer>,
+    mut activity: ResMut<SpawnActivity>,
 ) {
+    let mut processed = false;
     for event in reader.read() {
+        processed = true;
         let handle: Handle<AudioSource> = asset_server.load(event.file.as_str());
         // Stop any currently playing global track and start looping the new one
         audio.stop();
         audio.play(handle).looped();
     }
+    if processed { activity.idle_frames = 0; }
 }
 
 pub fn nest_spawn_listener(
     mut commands: Commands,
     mut reader: EventReader<NestSpawnEvent>,
+    mut activity: ResMut<SpawnActivity>,
 ) {
+    let mut processed = false;
     for event in reader.read() {
+        processed = true;
         match Structure::try_from(&event.reference) {
             Ok(structure) => {
                 // Create a container entity for the nested structure
@@ -352,14 +767,18 @@ pub fn nest_spawn_listener(
             }
         }
     }
+        if processed { activity.idle_frames = 0; }
 }
 
 pub fn choose_spawn_listener(
     mut commands: Commands,
     mut reader: EventReader<ChooseSpawnEvent>,
     mut gen_rng: ResMut<GenRng>,
+    mut activity: ResMut<SpawnActivity>,
 ) {
+    let mut processed = false;
     for event in reader.read() {
+        processed = true;
         match Structure::try_from(&event.list) {
             Ok(structure_list) => {
                 // Pick one
@@ -377,6 +796,7 @@ pub fn choose_spawn_listener(
             }
         }
     }
+    if processed { activity.idle_frames = 0; }
 }
 
 // Temporary no-op stubs to satisfy system registrations
@@ -384,8 +804,11 @@ pub fn choose_some_spawn_listener(
     mut commands: Commands,
     mut reader: EventReader<ChooseSomeSpawnEvent>,
     mut gen_rng: ResMut<GenRng>,
+    mut activity: ResMut<SpawnActivity>,
 ) {
+    let mut processed = false;
     for event in reader.read() {
+        processed = true;
         match Structure::try_from(&event.list) {
             Ok(structure_list) => {
                 let sub_structure = structure_list.create_random_substructure(&event.count, gen_rng.rng_mut());
@@ -402,14 +825,18 @@ pub fn choose_some_spawn_listener(
             }
         }
     }
+    if processed { activity.idle_frames = 0; }
 }
 
 pub fn rand_spawn_listener(
     mut commands: Commands,
     mut reader: EventReader<RandSpawnEvent>,
     mut gen_rng: ResMut<GenRng>,
+    mut activity: ResMut<SpawnActivity>,
 ) {
+    let mut processed = false;
     for event in reader.read() {
+        processed = true;
         let jiggled = jiggle_transform(&mut gen_rng, event.rand.clone(), event.transform.clone());
         let reference = event.reference.clone();
         let parent = event.parent;
@@ -417,14 +844,18 @@ pub fn rand_spawn_listener(
             world.send_event(NestSpawnEvent { reference, transform: jiggled, parent });
         });
     }
+    if processed { activity.idle_frames = 0; }
 }
 
 pub fn probability_spawn_listener(
     mut commands: Commands,
     mut reader: EventReader<ProbabilitySpawnEvent>,
     mut gen_rng: ResMut<GenRng>,
+    mut activity: ResMut<SpawnActivity>,
 ) {
+    let mut processed = false;
     for event in reader.read() {
+        processed = true;
         if gen_rng.rng_mut().gen::<f32>() < event.probability {
             let reference = event.reference.clone();
             let transform = event.transform.clone();
@@ -434,13 +865,17 @@ pub fn probability_spawn_listener(
             });
         } // else skip spawn
     }
+    if processed { activity.idle_frames = 0; }
 }
 
 pub fn loop_spawn_listener(
     mut commands: Commands,
     mut reader: EventReader<LoopSpawnEvent>,
+    mut activity: ResMut<SpawnActivity>,
 ) {
+    let mut processed = false;
     for event in reader.read() {
+        processed = true;
         // Container for grouping loop spawns
         let container = commands
             .spawn_empty()
@@ -496,13 +931,17 @@ pub fn loop_spawn_listener(
             });
         }
     }
+    if processed { activity.idle_frames = 0; }
 }
 
 pub fn nesting_loop_spawn_listener(
     mut commands: Commands,
     mut reader: EventReader<NestingLoopSpawnEvent>,
+    mut activity: ResMut<SpawnActivity>,
 ) {
+    let mut processed = false;
     for event in reader.read() {
+        processed = true;
         let base = Transform::from(event.transform.clone());
         let step = Transform::from(event.repeated_transform.clone());
 
@@ -520,18 +959,25 @@ pub fn nesting_loop_spawn_listener(
             });
         }
     }
+    if processed { activity.idle_frames = 0; }
 }
 
 pub fn noise_spawn_listener(
     mut commands: Commands,
     mut reader: EventReader<NoiseSpawnEvent>,
     mut gen_rng: ResMut<GenRng>,
+    mut activity: ResMut<SpawnActivity>,
 ) {
+    let mut processed = false;
     for event in reader.read() {
+        processed = true;
         // Container for grouping
+        // Use a non-scaling container so child meshes are not scaled. Keep translation/rotation, zero out scale.
+        let base = event.transform.clone();
+        let container_tr = EulerTransform { scale: (1.0, 1.0, 1.0), ..base.clone() };
         let container = commands
             .spawn_empty()
-            .insert(Transform::from(event.transform.clone()))
+            .insert(Transform::from(container_tr))
             .insert(InheritedVisibility::default())
             .insert(Name::new("Noise Spawn"))
             .id();
@@ -553,15 +999,18 @@ pub fn noise_spawn_listener(
         let points = generate_noise_spawn_points(&temp_key, &mut gen_rng);
 
         for (x, y, z) in points.into_iter() {
-            let base = event.transform.clone();
-            let new_translation = Vec3::new(
-                base.translation.0 + base.scale.0 * x,
-                base.translation.1 + base.scale.1 * z,
-                base.translation.2 + base.scale.2 * y,
+            // Apply desired radius scaling to local position so container can remain non-scaling.
+            // Mapping axes: generator (x, y, z) -> world (X, Z, Y)
+            //   - horizontal: X uses x, Z uses y
+            //   - vertical: Y uses z (0.0 for 2D noise)
+            let local = Vec3::new(
+                base.scale.0 * x,
+                base.scale.1 * z,
+                base.scale.2 * y,
             );
 
             let euler = EulerTransform {
-                translation: (new_translation.x, new_translation.y, new_translation.z),
+                translation: (local.x, local.y, local.z),
                 rotation: (0.0, 0.0, 0.0),
                 scale: (1.0, 1.0, 1.0),
             };
@@ -572,13 +1021,17 @@ pub fn noise_spawn_listener(
             });
         }
     }
+    if processed { activity.idle_frames = 0; }
 }
 
 pub fn path_spawn_listener(
     mut commands: Commands,
     mut reader: EventReader<PathSpawnEvent>,
+    mut activity: ResMut<SpawnActivity>,
 ) {
+    let mut processed = false;
     for event in reader.read() {
+        processed = true;
         // Container for grouping
         let container = commands
             .spawn_empty()
@@ -614,6 +1067,7 @@ pub fn path_spawn_listener(
             });
         }
     }
+    if processed { activity.idle_frames = 0; }
 }
 
 pub fn reflection_spawn_listener(
@@ -955,4 +1409,51 @@ fn is_descendant(ancestor: Entity, child: Entity, parent_query: &Query<&Parent>)
         current = parent.get();
     }
     false
+}
+
+// Despawn the lower-priority entity whenever two colliders with ColliderPriority make contact.
+pub fn collider_priority_despawn_system(
+    mut commands: Commands,
+    mut contact_events: EventReader<ContactForceEvent>,
+    mut collision_events: EventReader<CollisionEvent>,
+    priorities: Query<&ColliderPriority>,
+    name_query: Query<&Name>,
+) {
+    // Process contact force events (if any)
+    for ev in contact_events.read() {
+        let a = ev.collider1;
+        let b = ev.collider2;
+        if let (Ok(pa), Ok(pb)) = (priorities.get(a), priorities.get(b)) {
+            let name_a = name_query.get(a).ok().map(|n| n.as_str().to_string());
+            let name_b = name_query.get(b).ok().map(|n| n.as_str().to_string());
+            info!(
+                "[PriorityDespawn] ContactForce: {:?}({:?})[{}] <-> {:?}({:?})[{}]",
+                a, name_a, pa.0, b, name_b, pb.0
+            );
+            if pa.0 == pb.0 { continue; }
+            let loser = if pa.0 < pb.0 { a } else { b };
+            let loser_name = name_query.get(loser).ok().map(|n| n.as_str().to_string());
+            info!("[PriorityDespawn] Despawning lower priority entity: {:?} ({:?})", loser, loser_name);
+            commands.entity(loser).despawn_recursive();
+        }
+    }
+
+    // Also process basic collision start events (more reliable for kinematic bodies)
+    for ev in collision_events.read() {
+        if let CollisionEvent::Started(a, b, _) = ev {
+            if let (Ok(pa), Ok(pb)) = (priorities.get(*a), priorities.get(*b)) {
+                let name_a = name_query.get(*a).ok().map(|n| n.as_str().to_string());
+                let name_b = name_query.get(*b).ok().map(|n| n.as_str().to_string());
+                info!(
+                    "[PriorityDespawn] CollisionStart: {:?}({:?})[{}] <-> {:?}({:?})[{}]",
+                    a, name_a, pa.0, b, name_b, pb.0
+                );
+                if pa.0 == pb.0 { continue; }
+                let loser = if pa.0 < pb.0 { *a } else { *b };
+                let loser_name = name_query.get(loser).ok().map(|n| n.as_str().to_string());
+                info!("[PriorityDespawn] Despawning lower priority entity: {:?} ({:?})", loser, loser_name);
+                commands.entity(loser).despawn_recursive();
+            }
+        }
+    }
 }

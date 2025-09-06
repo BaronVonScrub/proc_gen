@@ -1,14 +1,10 @@
-use std::any::Any;
-use serde::{Serialize, Deserialize};
 use bevy::prelude::*;
-use crate::core::collider::ColliderInfo;
 use crate::core::fbm_data::FBMData;
 use crate::core::rand_data::RandData;
 use crate::core::sample_size::SampleSize;
 use crate::core::spread_data::SpreadData;
 use crate::core::structure_reference::StructureReference;
 use crate::spawning::euler_transform::EulerTransform;
-use crate::spawning::object_logic::{ObjectType, Ownership};
 use crate::core::tmaterial::TMaterial;
 use crate::core::structure_key::StructureKey;
 

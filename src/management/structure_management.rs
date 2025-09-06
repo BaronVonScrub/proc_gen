@@ -10,7 +10,7 @@ lazy_static! {
     static ref STRUCTURE_CACHE: Mutex<HashMap<String, Structure>> = Mutex::new(HashMap::new());
 }
 
-/// Normalize a structure name like "Castle/damaged_castle" into a path
+/// Normalize a structure name like "Castle/castle_with_doors" into a path
 /// by splitting on both '/' and '\\' and appending the .arch extension.
 fn normalized_structure_relpath(structure_name: &str) -> PathBuf {
     let mut pb = PathBuf::new();

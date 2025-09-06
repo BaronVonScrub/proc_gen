@@ -11,7 +11,7 @@
                         hy: 0.6,
                         hz: 0.22,
                     ),
-                    priority: 0,
+                    priority: 10,
                     behaviour: Kinematic,
                 )
             ),

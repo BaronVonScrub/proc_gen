@@ -35,12 +35,12 @@
             scale: (1.0, 1.0, 1.0),
         )),
         (Nest(Ref(
-            structure: "Castle/WallParts/wall_corner_one_door",
+            structure: "Castle/WallParts/wall_corner_one_door_alt",
             ownership: Inherit,
         )), (
-            translation: (-2.0, 0.0, 2.0),
-            rotation: (0.0, 0.0, 0.0),
-            scale: (-1.0, 1.0, 1.0),
+            translation: (0.0, 0.0, 0.0),
+            rotation: (0.0, 90.0, 0.0),
+            scale: (1.0, 1.0, 1.0),
         )),
         (Nest(Ref(
             structure: "Castle/WallParts/wall_corner_one_door",

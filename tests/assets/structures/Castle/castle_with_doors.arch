@@ -1,5 +1,5 @@
 (
-    structure_name: "Castle",
+    structure_name: "Castle With Doors",
     tags: [],
     data: [
         (SelectiveReplacement(
@@ -8,11 +8,11 @@
                 ownership: Team(1),
             ),
             replacement_reference: Ref(
-                structure: "test_unit",
+                structure: "Castle/WallParts/doorway_with_door",
                 ownership: Team(1),
             ),
-            tags: ["Test"],
-            replace_count: 4),
+            tags: ["Door Candidate"],
+            replace_count: 3),
         (
             translation: (-1.0, 0.0, 1.0),
             rotation: (0.0, 0.0, 0.0),

@@ -1,5 +1,5 @@
 (
-    structure_name: "Castle",
+    structure_name: "Castle With Doors",
     tags: [],
     data: [
         (SelectiveReplacement(

@@ -27,12 +27,12 @@
             scale: (1.0, 1.0, 1.0),
         )),
         (Nest(Ref(
-            structure: "Castle/WallParts/dead_end",
+            structure: "Castle/WallParts/dead_end_alt",
             ownership: Inherit,
         )), (
             translation: (0.0, 0.0, 0.0),
             rotation: (0.0, 90.0, 0.0),
-            scale: (1.0, 1.0, -1.0),
+            scale: (1.0, 1.0, 1.0),
         )),
     ],
 )

@@ -16,6 +16,9 @@ pub struct ColliderInfo {
     pub behaviour: ColliderBehaviour,
 }
 
+#[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ColliderPriority(pub i8);
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum ColliderType {
     None,

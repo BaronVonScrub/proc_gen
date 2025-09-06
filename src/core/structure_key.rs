@@ -15,6 +15,7 @@ use crate::event_system::spawn_events::*;
 use crate::management::structure_management::import_structure;
 use crate::spawning::euler_transform::EulerTransform;
 use crate::spawning::object_logic::{ObjectType, Ownership};
+use bevy::ecs::world::World;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum StructureKey {
@@ -186,9 +187,6 @@ impl StructureKey {
         }
     }
 }
-
-use bevy::ecs::world::World;
-use bevy::prelude::*;
 
 impl StructureKey {
     pub fn dispatch_event(&self, transform: EulerTransform, parent: Option<Entity>, commands: &mut Commands) {

@@ -1,5 +1,5 @@
 (
-    structure_name: "Wall Model",
+    structure_name: "Door Candidate",
     tags: [
         "Door Candidate",
     ],
@@ -13,7 +13,7 @@
                     hy:0.6,
                     hz:0.49,
                 ),
-                priority: 0,
+                priority: 10,
                 behaviour: Kinematic,
             )
             ),

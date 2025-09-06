@@ -11,7 +11,7 @@
             scale: (1.0, 1.0, 1.0),
         )),
         (Nest(Ref(
-            structure: "Castle/damaged_castle",
+            structure: "Castle/castle_with_doors",
             ownership: Team(2),
         )), (
             translation: (5.0, 0.0, 0.0),

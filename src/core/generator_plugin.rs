@@ -1,11 +1,9 @@
-use bevy::prelude::*;
 use bevy::app::{App, Plugin};
 
 use crate::spawning::helpers::GenRng;
 use crate::core::tags::Tags;
 use crate::serialization::caching::MaterialCache;
 use crate::management::material_autoloader::MaterialAutoloader;
- 
 
 pub struct GeneratorPlugin;
 

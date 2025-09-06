@@ -1,28 +1,28 @@
 (
-    structure_name: "Knife Quadrant B",
+    structure_name: "Wall Corner (One Door Alt)",
     tags: [],
     data: [
         (Nest(Ref(
-            structure: "Castle/Sectors/sector",
+            structure: "Castle/WallParts/wall_model",
             ownership: Inherit,
         )), (
-            translation: (0.0, 0.0, 2.0),
-            rotation: (0.0, 0.0, 0.0),
+            translation: (-2.0, 0.0, 1.0),
+            rotation: (0.0, 90.0, 0.0),
             scale: (1.0, 1.0, 1.0),
         )),
         (Nest(Ref(
-            structure: "Castle/WallParts/dead_end_alt",
+            structure: "Castle/WallParts/wall_corner_model",
             ownership: Inherit,
         )), (
-            translation: (0.0, 0.0, 0.0),
-            rotation: (0.0, 90.0, 0.0),
+            translation: (-3.25, 0.0, 1.25),
+            rotation: (0.0, 180.0, 0.0),
             scale: (1.0, 1.0, 1.0),
         )),
         (Nest(Ref(
             structure: "Castle/WallParts/door_candidate",
             ownership: Inherit,
         )), (
-            translation: (-1.0, 0.0, 0.0),
+            translation: (-3.0, 0.0, 0.0),
             rotation: (0.0, 0.0, 0.0),
             scale: (1.0, 1.0, 1.0),
         )),

@@ -1,0 +1,40 @@
+(
+    structure_name: "Castle With Trees",
+    tags: [],
+    data: [
+        // Base castle with doors
+        (Nest(Ref(
+            structure: "Castle/castle_with_doors",
+            ownership: Inherit,
+        )), (
+            translation: (0.0, 0.0, 0.0),
+            rotation: (0.0, 0.0, 0.0),
+            scale: (1.0, 1.0, 1.0),
+        )),
+
+        // Tree scattering around the castle using noise-based placement
+        (NoiseSpawn(
+            reference: Ref(
+                structure: "Trees/tree",
+                ownership: Inherit,
+            ),
+            fbm: FBMData(
+                seed: Unseeded,
+                scale: 0.8,
+                octaves: 4,
+                frequency: 2.0,
+                lacunarity: 2.0,
+                persistence: 0.5,
+            ),
+            sample_size: UBiDim(40),
+            count: 40,
+            exclusivity_radius: 8.0,
+            resolution_modifier: 1.0,
+        ), (
+            translation: (0.0, 0.0, 0.0),
+            rotation: (0.0, 0.0, 0.0),
+            // X/Z define the scatter radius, Y controls vertical offset scaling (keep 0.0 for flat ground)
+            scale: (35.0, 0.0, 35.0),
+        )),
+    ],
+)

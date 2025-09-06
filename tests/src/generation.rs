@@ -1,11 +1,11 @@
 use bevy::prelude::{Commands, Mesh, Vec2};
-use bevy_math::prelude::Plane3d;
-use bevy_utils::default;
+use bevy_math::primitives::Circle;
 use proc_gen::core::tmaterial::TMaterial;
 use proc_gen::spawning::euler_transform::EulerTransform;
 use proc_gen::spawn;
 use proc_gen::event_system::spawn_events::*;
 use bevy::prelude::*;
+use proc_gen::event_system::event_listeners::{GenerationState, CollisionResolutionTimer};
 use proc_gen::spawning::helpers::GenRng;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -20,29 +20,20 @@ fn send_generation_events(c: &mut Commands, parent: Option<Entity>) {
     });
 
     spawn!(c, StructureSpawnEvent {
-        structure: "Castle/damaged_castle".to_string(),
+        structure: "Castle/castle_with_trees".to_string(),
         transform: Default::default(),
         parent,
     });
 
-    spawn!(c, StructureSpawnEvent {
-        structure: "test_unit".to_string(),
-        transform: EulerTransform {
-            translation: (10.0, 0.0, -10.0),
-            rotation: Default::default(),
-            scale: (1.0, 1.0, 1.0),
-        },
-        parent,
-    });
-
     spawn!(c, MeshSpawnEvent {
-        mesh: Mesh::from(Plane3d { ..default() })
+        mesh: Mesh::from(Circle::new(11.0))
             .with_generated_tangents()
             .unwrap(),
         transform: EulerTransform {
             translation: (0.0, 0.0, 0.0),
-            rotation: (0.0, 0.0, 0.0),
-            scale: (20.0, 20.0, 20.0),
+            // Circle lies in XY plane by default; rotate -90deg around X to place it on XZ ground
+            rotation: (-90.0, 0.0, 0.0),
+            scale: (1.0, 1.0, 1.0),
         },
         material: TMaterial::TiledMaterial {
             material_name: "Grass".to_string(),
@@ -70,6 +61,8 @@ pub(crate) fn reset_on_space(
     keys: Res<ButtonInput<KeyCode>>,
     mut gen_rng: ResMut<GenRng>,
     roots: Query<Entity, With<GeneratedRoot>>,
+    mut next_state: ResMut<NextState<GenerationState>>,
+    mut collision_timer: ResMut<CollisionResolutionTimer>,
 ) {
     if !keys.just_pressed(KeyCode::Space) { return; }
 
@@ -93,4 +86,8 @@ pub(crate) fn reset_on_space(
         .id();
 
     send_generation_events(&mut commands, Some(new_root));
+
+    // Reset generation pipeline state so it runs again
+    collision_timer.frames = 0;
+    next_state.set(GenerationState::Generating);
 }
