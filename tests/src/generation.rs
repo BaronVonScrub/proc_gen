@@ -11,7 +11,6 @@ use proc_gen::event_system::event_listeners::{
     CurrentPass,
     HighestPassIndex,
     PendingInPass,
-    AllPathsDebug,
 };
 use proc_gen::spawning::helpers::GenRng;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -74,7 +73,6 @@ pub(crate) fn reset_on_space(
     mut cur_pass: ResMut<CurrentPass>,
     mut highest_pass: ResMut<HighestPassIndex>,
     mut pending_inpass: ResMut<PendingInPass>,
-    mut paths_dbg: ResMut<AllPathsDebug>,
 ) {
     if !keys.just_pressed(KeyCode::Space) { return; }
 
@@ -105,7 +103,5 @@ pub(crate) fn reset_on_space(
     cur_pass.0 = 0;
     highest_pass.0 = 0;
     pending_inpass.0.clear();
-    // Clear accumulated path debug lines
-    paths_dbg.paths.clear();
     next_state.set(GenerationState::Generating);
 }

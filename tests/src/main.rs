@@ -3,6 +3,10 @@ use bevy_atmosphere::plugin::AtmospherePlugin;
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_kira_audio::{AudioApp, AudioPlugin, SpatialAudioPlugin};
 use bevy_rapier3d::prelude::{NoUserData, RapierPhysicsPlugin};
+#[cfg(feature = "debug")]
+use bevy_rapier3d::prelude::RapierDebugRenderPlugin;
+#[cfg(feature = "debug")]
+use bevy_rapier3d::render::{DebugRenderContext, ColliderDebug};
 use proc_gen::core::generator_plugin::GeneratorPlugin;
 use oxidized_navigation::{OxidizedNavigationPlugin, NavMeshSettings};
 use oxidized_navigation::debug_draw::OxidizedNavigationDebugDrawPlugin;
@@ -88,9 +92,16 @@ fn main() {
 
     // Setup physics
     app.add_plugins(RapierPhysicsPlugin::<NoUserData>::default());
-
-    // Optionally, if needed, you can add the physics debug plugin:
-    // app.add_plugins(RapierDebugRenderPlugin::default());
+    // Physics debug render (colliders, contacts) when 'debug' feature is enabled
+    #[cfg(feature = "debug")]
+    {
+        // Enable collider debug rendering by default
+        app.insert_resource(DebugRenderContext {
+            default_collider_debug: ColliderDebug::AlwaysRender,
+            ..Default::default()
+        });
+        app.add_plugins(RapierDebugRenderPlugin::default());
+    }
 
     // Setup navmesh generation and debug draw
     app.add_plugins(OxidizedNavigationPlugin::<bevy_rapier3d::prelude::Collider>::new(

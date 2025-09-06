@@ -14,7 +14,10 @@ impl Plugin for EventSystemPlugin {
         app.init_resource::<GeneratingFrameCounter>();
         app.init_resource::<SpawnActivity>();
         app.init_resource::<GenerationAdvanceArming>();
-        app.init_resource::<AllPathsDebug>();
+        #[cfg(feature = "debug")]
+        {
+            app.init_resource::<AllPathsDebug>();
+        }
         app.init_resource::<CurrentPass>();
         app.init_resource::<HighestPassIndex>();
         app.init_resource::<PendingInPass>();
@@ -62,8 +65,11 @@ impl Plugin for EventSystemPlugin {
 
         // UI overlay update (always on)
         app.add_systems(Update, update_generation_state_overlay);
-        // Always draw accumulated path debug gizmos
-        app.add_systems(Update, draw_all_paths_debug);
+        // Draw accumulated path debug gizmos when enabled
+        #[cfg(feature = "debug")]
+        {
+            app.add_systems(Update, draw_all_paths_debug);
+        }
 
         // Generation-time systems only
         app.add_systems(Update, (

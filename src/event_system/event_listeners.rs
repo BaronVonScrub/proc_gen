@@ -94,7 +94,6 @@ pub fn process_pending_inpass(
     if any_spawned { activity.idle_frames = 0; }
 }
 
-// Collects all computed world-space paths for debug drawing
 #[derive(Resource, Default)]
 pub struct AllPathsDebug {
     pub paths: Vec<Vec<Vec3>>, // list of polylines
@@ -146,10 +145,8 @@ pub fn rand_dist_dir_spawn_listener(
     if processed { activity.idle_frames = 0; }
 }
 
-pub fn draw_all_paths_debug(
-    mut gizmos: Gizmos,
-    dbg: Res<AllPathsDebug>,
-) {
+#[cfg(feature = "debug")]
+pub fn draw_all_paths_debug(mut gizmos: Gizmos, dbg: Res<AllPathsDebug>) {
     if dbg.paths.is_empty() { return; }
     for poly in dbg.paths.iter() {
         if poly.len() < 2 { continue; }
@@ -167,7 +164,7 @@ pub fn path_to_tag_spawn_listener(
     tag_query: Query<(&GlobalTransform, &Tags)>,
     nav_mesh: Option<Res<oxidized_navigation::NavMesh>>,
     settings: Option<Res<oxidized_navigation::NavMeshSettings>>,
-    mut all_dbg: ResMut<AllPathsDebug>,
+    #[cfg(feature = "debug")] mut all_dbg: ResMut<AllPathsDebug>,
     parent_query: Query<&GlobalTransform>,
     mut activity: ResMut<SpawnActivity>,
 ) {
@@ -479,8 +476,10 @@ pub fn path_to_tag_spawn_listener(
         if path_points.len() < 2 { continue; }
 
         // Store world-space path for global debug
-        all_dbg.paths.push(path_points.clone());
-        if all_dbg.paths.len() > 256 { all_dbg.paths.remove(0); }
+        #[cfg(feature = "debug")] {
+            all_dbg.paths.push(path_points.clone());
+            if all_dbg.paths.len() > 256 { all_dbg.paths.remove(0); }
+        }
 
         // Convert world-space points to the container's local space using the full inverse transform
         // (accounts for rotation and scale, not just translation)

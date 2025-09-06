@@ -22,3 +22,6 @@ image = "0.25.1"
 [[bin]]
 name = "main"
 path = "src/main.rs"
+
+[features]
+debug = ["proc_gen/debug"]

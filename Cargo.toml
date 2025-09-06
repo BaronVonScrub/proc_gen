@@ -82,6 +82,7 @@ path = "src/lib.rs"
 
 [features]
 test = []
+debug = ["bevy_rapier3d/debug-render"]
 
 [workspace]
 members = ["tests"]
