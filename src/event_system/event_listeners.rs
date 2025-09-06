@@ -8,6 +8,7 @@ use crate::event_system::spawn_events::*;
 use crate::core::tmaterial::TMaterial;
 use crate::serialization::caching::MaterialCache;
 use std::path::Path;
+use std::collections::HashSet;
 use crate::spawning::object_logic::{ObjectType, Pathfinder, PathState, Selectable};
 use crate::core::structure_key::StructureKey;
 use crate::core::collider::{ColliderBehaviour, ColliderPriority};
@@ -2001,6 +2002,8 @@ pub fn collider_priority_despawn_system(
     priorities: Query<&ColliderPriority>,
     name_query: Query<&Name>,
 ) {
+    // Track entities we already queued for despawn this frame to avoid double-despawn warnings
+    let mut already_despawned: HashSet<Entity> = HashSet::new();
     // Process contact force events (if any)
     for ev in contact_events.read() {
         let a = ev.collider1;
@@ -2015,8 +2018,14 @@ pub fn collider_priority_despawn_system(
             if pa.0 == pb.0 { continue; }
             let loser = if pa.0 < pb.0 { a } else { b };
             let loser_name = name_query.get(loser).ok().map(|n| n.as_str().to_string());
-            info!("[PriorityDespawn] Despawning lower priority entity: {:?} ({:?})", loser, loser_name);
-            commands.entity(loser).despawn_recursive();
+            if already_despawned.insert(loser) {
+                info!("[PriorityDespawn] Despawning lower priority entity: {:?} ({:?})", loser, loser_name);
+                commands.queue(move |world: &mut World| {
+                    if let Ok(ent) = world.get_entity_mut(loser) {
+                        ent.despawn_recursive();
+                    }
+                });
+            }
         }
     }
 
@@ -2027,14 +2036,20 @@ pub fn collider_priority_despawn_system(
                 let name_a = name_query.get(*a).ok().map(|n| n.as_str().to_string());
                 let name_b = name_query.get(*b).ok().map(|n| n.as_str().to_string());
                 info!(
-                    "[PriorityDespawn] CollisionStart: {:?}({:?})[{}] <-> {:?}({:?})[{}]",
-                    a, name_a, pa.0, b, name_b, pb.0
+                    "[PriorityDespawn] CollisionStarted: {:?}({:?})[{}] <-> {:?}({:?})[{}]",
+                    *a, name_a, pa.0, *b, name_b, pb.0
                 );
                 if pa.0 == pb.0 { continue; }
                 let loser = if pa.0 < pb.0 { *a } else { *b };
                 let loser_name = name_query.get(loser).ok().map(|n| n.as_str().to_string());
-                info!("[PriorityDespawn] Despawning lower priority entity: {:?} ({:?})", loser, loser_name);
-                commands.entity(loser).despawn_recursive();
+                if already_despawned.insert(loser) {
+                    info!("[PriorityDespawn] Despawning lower priority entity: {:?} ({:?})", loser, loser_name);
+                    commands.queue(move |world: &mut World| {
+                        if let Ok(ent) = world.get_entity_mut(loser) {
+                            ent.despawn_recursive();
+                        }
+                    });
+                }
             }
         }
     }
