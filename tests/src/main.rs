@@ -1,5 +1,6 @@
 use bevy::prelude::*;
 use bevy_atmosphere::plugin::AtmospherePlugin;
+use bevy_atmosphere::prelude::*;
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_kira_audio::{AudioApp, AudioPlugin, SpatialAudioPlugin};
 use bevy_rapier3d::prelude::{NoUserData, RapierPhysicsPlugin};
@@ -26,7 +27,6 @@ fn main() {
                     backends: Some(bevy::render::settings::Backends::VULKAN),
                     ..default()
                 }
-
                     .into(),
                 ..default()
             })
@@ -69,6 +69,14 @@ fn main() {
 
     // Setup skybox (atmosphere)
     app.add_plugins(AtmospherePlugin);
+    // Provide a custom Nishita model up-front (no startup system needed)
+    app.insert_resource(AtmosphereModel::new(Nishita {
+        sun_position: Vec3::new(0.0, 1.0, 1.0).normalize(),
+        rayleigh_coefficient: Nishita::default().rayleigh_coefficient * Vec3::new(5.0, 2.05, 0.2),
+        mie_coefficient: Nishita::default().mie_coefficient * 2.0,
+        mie_direction: 0.6,
+        ..Default::default()
+    }));
 
     app.add_systems(OnEnter(proc_gen::management::material_autoloader::GameState::Playing), generation::generate_map);
     app.add_systems(Update, generation::reset_on_space);
@@ -119,3 +127,5 @@ fn main() {
 
     app.run();
 }
+
+// (Removed startup system; AtmosphereModel is inserted at plugin setup time)
