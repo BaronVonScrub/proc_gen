@@ -523,6 +523,12 @@ pub fn generation_state_driver(
 ) {
     match *state.get() {
         GenerationState::Generating => {
+            // Observe activity resets: idle_frames resets to 0 whenever a spawn listener processed events.
+            // If we ever observe a drop, mark that we've seen actual activity in this Generating phase.
+            if activity.idle_frames < arming.last_idle_frames {
+                arming.seen_activity = true;
+            }
+            arming.last_idle_frames = activity.idle_frames;
             // Pending work check updates stability
             let any_pending = !gen_only_pending.is_empty() || !selective_pending.is_empty();
             if any_pending {
@@ -545,7 +551,9 @@ pub fn generation_state_driver(
             const MIN_GENERATING_FRAMES: u16 = 30;
             const REQUIRED_STABLE_FRAMES: u8 = 20;
             const REQUIRED_IDLE_FRAMES: u8 = 5;
-            let ready = generating_frames.frames_in_generating >= MIN_GENERATING_FRAMES
+            // Require at least one observed activity reset before progressing out of Generating.
+            let ready = arming.seen_activity
+                && generating_frames.frames_in_generating >= MIN_GENERATING_FRAMES
                 && stability.no_pending_stable_frames >= REQUIRED_STABLE_FRAMES
                 && activity.idle_frames >= REQUIRED_IDLE_FRAMES;
 
@@ -608,6 +616,8 @@ pub fn reset_generating_phase(
     gen_counter.frames_in_generating = 0;
     activity.idle_frames = 0;
     arming.spawn_done_frames = 0;
+    arming.seen_activity = false;
+    arming.last_idle_frames = activity.idle_frames;
 }
 
 
@@ -715,6 +725,8 @@ impl Default for NavMeshPriorityThreshold {
 #[derive(Resource, Default)]
 pub struct GenerationAdvanceArming {
     pub spawn_done_frames: u8,
+    pub seen_activity: bool,
+    pub last_idle_frames: u8,
 }
 
 // Marker used to delay adding NavMeshAffector until we're ready to build the navmesh
