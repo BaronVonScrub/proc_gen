@@ -15,6 +15,8 @@ use proc_gen::event_system::event_listeners::{
 use proc_gen::spawning::helpers::GenRng;
 use std::time::{SystemTime, UNIX_EPOCH};
 use proc_gen::management::structure_management::clear_structure_cache;
+#[cfg(feature = "debug")]
+use proc_gen::event_system::event_listeners::AllPathsDebug;
 
 #[derive(Component)]
 pub(crate) struct GeneratedRoot;
@@ -74,8 +76,13 @@ pub(crate) fn reset_on_space(
     mut cur_pass: ResMut<CurrentPass>,
     mut highest_pass: ResMut<HighestPassIndex>,
     mut pending_inpass: ResMut<PendingInPass>,
+    #[cfg(feature = "debug")] mut all_paths_debug: Option<ResMut<AllPathsDebug>>,
 ) {
     if !keys.just_pressed(KeyCode::Space) { return; }
+
+    // Immediately clear debug overlay paths so the next frame draws nothing
+    #[cfg(feature = "debug")]
+    if let Some(mut dbg) = all_paths_debug.as_mut() { dbg.paths.clear(); }
 
     // Fresh, non-deterministic seed from system time
     let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default();

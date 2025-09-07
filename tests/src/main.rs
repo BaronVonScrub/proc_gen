@@ -11,6 +11,7 @@ use bevy_rapier3d::render::{DebugRenderContext, ColliderDebug};
 use proc_gen::core::generator_plugin::GeneratorPlugin;
 use oxidized_navigation::{OxidizedNavigationPlugin, NavMeshSettings};
 use oxidized_navigation::debug_draw::OxidizedNavigationDebugDrawPlugin;
+use proc_gen::core::components::MainDirectionalLight;
 
 mod input_manager;
 mod camera;
@@ -78,6 +79,9 @@ fn main() {
         ..Default::default()
     }));
 
+    // Keep atmosphere's sun aligned with the authored MainDirectionalLight
+    app.add_systems(Update, sync_sun_to_main_dir_light);
+
     app.add_systems(OnEnter(proc_gen::management::material_autoloader::GameState::Playing), generation::generate_map);
     app.add_systems(Update, generation::reset_on_space);
 
@@ -114,7 +118,7 @@ fn main() {
     // Setup navmesh generation and debug draw
     app.add_plugins(OxidizedNavigationPlugin::<bevy_rapier3d::prelude::Collider>::new(
         NavMeshSettings::from_agent_and_bounds(
-            0.5,   // agent radius
+            0.2,   // agent radius
             1.9,   // agent height
             250.0, // world half extents
             -1.0,  // world bottom bound (y)
@@ -122,10 +126,43 @@ fn main() {
     ));
     app.add_plugins(OxidizedNavigationDebugDrawPlugin);
 
+    // When built with the `debug` feature, enable navmesh debug drawing (toggle existing resource)
+    #[cfg(feature = "debug")]
+    {
+        app.add_systems(Startup, enable_navmesh_debug);
+    }
+
     // Setup object logic
     app.add_plugins(proc_gen::spawning::object_logic::ObjectLogicPlugin);
 
     app.run();
 }
 
+// Align Nishita sun position with the MainDirectionalLight orientation so light appears to come from the sun
+fn sync_sun_to_main_dir_light(
+    light_q: Query<&GlobalTransform, With<MainDirectionalLight>>,
+    mut model: ResMut<AtmosphereModel>,
+) {
+    let Ok(gt) = light_q.get_single() else { return; };
+    if let Some(nishita) = model.to_mut::<Nishita>() {
+        let tf = gt.compute_transform();
+        // Bevy directional light illuminates along -forward(); set the sun_position to match the illumination direction
+        // so the light appears to come FROM the sun in the sky.
+        let light_dir = -tf.forward();
+        if light_dir.length_squared() > 0.0 {
+            nishita.sun_position = light_dir.normalize();
+        }
+    }
+}
+
 // (Removed startup system; AtmosphereModel is inserted at plugin setup time)
+
+// Only compiled with the `debug` feature: toggle the existing DrawNavMesh resource on at startup
+#[cfg(feature = "debug")]
+fn enable_navmesh_debug(
+    mut maybe_draw: Option<ResMut<oxidized_navigation::debug_draw::DrawNavMesh>>,
+) {
+    if let Some(mut draw) = maybe_draw {
+        draw.0 = true;
+    }
+}
