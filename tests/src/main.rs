@@ -1,5 +1,7 @@
 use bevy::prelude::*;
+#[cfg(feature = "atmosphere")]
 use bevy_atmosphere::plugin::AtmospherePlugin;
+#[cfg(feature = "atmosphere")]
 use bevy_atmosphere::prelude::*;
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_kira_audio::{AudioApp, AudioPlugin, SpatialAudioPlugin};
@@ -68,19 +70,13 @@ fn main() {
         WorldInspectorPlugin::default().run_if(bevy::input::common_conditions::input_toggle_active(false, KeyCode::Escape)),
     );
 
-    // Setup skybox (atmosphere)
-    app.add_plugins(AtmospherePlugin);
-    // Provide a custom Nishita model up-front (no startup system needed)
-    app.insert_resource(AtmosphereModel::new(Nishita {
-        sun_position: Vec3::new(0.0, 1.0, 1.0).normalize(),
-        rayleigh_coefficient: Nishita::default().rayleigh_coefficient * Vec3::new(5.0, 2.05, 0.2),
-        mie_coefficient: Nishita::default().mie_coefficient * 2.0,
-        mie_direction: 0.6,
-        ..Default::default()
-    }));
-
-    // Keep atmosphere's sun aligned with the authored MainDirectionalLight
-    app.add_systems(Update, sync_sun_to_main_dir_light);
+    // Setup skybox (atmosphere). Do not insert a default model; allow .arch to author it.
+    #[cfg(feature = "atmosphere")]
+    {
+        app.add_plugins(AtmospherePlugin);
+        // Keep atmosphere's sun aligned with the authored MainDirectionalLight (only when authored to do so)
+        app.add_systems(Update, sync_sun_to_main_dir_light);
+    }
 
     app.add_systems(OnEnter(proc_gen::management::material_autoloader::GameState::Playing), generation::generate_map);
     app.add_systems(Update, generation::reset_on_space);
@@ -139,11 +135,20 @@ fn main() {
 }
 
 // Align Nishita sun position with the MainDirectionalLight orientation so light appears to come from the sun
+#[cfg(feature = "atmosphere")]
 fn sync_sun_to_main_dir_light(
     light_q: Query<&GlobalTransform, With<MainDirectionalLight>>,
-    mut model: ResMut<AtmosphereModel>,
+    model: Option<ResMut<AtmosphereModel>>,
+    align: Option<Res<proc_gen::event_system::event_listeners::AtmosphereAlignToMainLight>>,
 ) {
     let Ok(gt) = light_q.get_single() else { return; };
+    // Only align if the authored option is present and true
+    if let Some(align) = align {
+        if !align.0 { return; }
+    } else {
+        return;
+    }
+    let Some(mut model) = model else { return; };
     if let Some(nishita) = model.to_mut::<Nishita>() {
         let tf = gt.compute_transform();
         // Bevy directional light illuminates along -forward(); set the sun_position to match the illumination direction

@@ -1,7 +1,9 @@
 use bevy::app::{App, Plugin};
 use bevy::input::mouse::{ MouseWheel};
 use bevy::prelude::*;
+#[cfg(feature = "atmosphere")]
 use bevy_atmosphere::plugin::AtmosphereCamera;
+
 use bevy_kira_audio::SpatialAudioReceiver;
 use crate::input_manager::{InputStates, MouseButtonState};
 use proc_gen::core::components::MainCamera;
@@ -66,10 +68,15 @@ pub(crate) fn initialize_camera_system(
 
 
     // Spawn the MainCamera entity as a child of the CameraSystem entity
-    commands.spawn_empty()
+    let mut cam = commands.spawn_empty();
+    cam
         .insert(Camera3d::default())
-        .insert(cam_trans)
-        .insert(AtmosphereCamera::default())
+        .insert(cam_trans);
+    #[cfg(feature = "atmosphere")]
+    {
+        cam.insert(AtmosphereCamera::default());
+    }
+    cam
         .insert(DistanceFog {
             color: Color::srgba(0.35, 0.48, 0.66, 1.0),
             directional_light_color: Color::srgba(171.0 / 255.0, 183.0 / 255.0, 255.0 / 255.0, 1.0),

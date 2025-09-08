@@ -9,7 +9,7 @@ proc_gen = { workspace = true }
 bevy = "0.15.3"
 bevy_kira_audio = { version = "0.22.0", default-features = false, features = ["mp3"] }
 bevy-inspector-egui = "0.29.1"
-bevy_atmosphere = "0.12.2"
+bevy_atmosphere = { version = "0.12.2", optional = true }
 bevy_math = "0.15.3"
 bevy_utils = "0.15.3"
 bevy_pbr = "0.15.3"
@@ -25,3 +25,7 @@ path = "src/main.rs"
 
 [features]
 debug = ["proc_gen/debug"]
+castle = []
+tree = []
+map = []
+atmosphere = ["proc_gen/atmosphere", "dep:bevy_atmosphere"]

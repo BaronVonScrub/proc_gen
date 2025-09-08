@@ -35,11 +35,20 @@ pub enum StructureKey {
     SoundEffect(String),
     #[serde(with = "SerializableDirectionalLight")]
     DirectionalLight(DirectionalLight),
+    #[serde(with = "SerializableDirectionalLight")]
+    MainDirectionalLight(DirectionalLight),
     #[serde(with = "SerializableAmbientLight")]
     AmbientLight(AmbientLight),
     #[serde(with = "SerializableDistanceFog")]
     DistanceFog(DistanceFog),
     BackgroundMusic(String),
+    AtmosphereNishita {
+        sun_position: Vec3,
+        rayleigh_multiplier: Vec3,
+        mie_multiplier: f32,
+        mie_direction: f32,
+        align_to_main_light: bool,
+    },
     Nest(StructureReference),
     Choose {
         list: StructureReference,
@@ -64,6 +73,16 @@ pub enum StructureKey {
         reference: StructureReference,
         shift_transform: EulerTransform,
         child_transform: EulerTransform,
+        count: usize,
+    },
+    LoopParam {
+        reference: StructureReference,
+        origin: Vec3,
+        rotation: Vec3,
+        distance: f32,
+        child_position: Vec3,
+        child_rotation: Vec3,
+        child_scale: Vec3,
         count: usize,
     },
     NestingLoop {
@@ -143,9 +162,15 @@ impl StructureKey {
                 StructureReference::Raw { structure, .. } => format!("Loop {:?}", structure.structure_name.clone()),
                 StructureReference::Ref { structure, .. } => format!("Loop {:?}", structure.clone()),
             },
+            StructureKey::LoopParam { reference, .. } => match reference {
+                StructureReference::Raw { structure, .. } => format!("LoopParam {:?}", structure.structure_name.clone()),
+                StructureReference::Ref { structure, .. } => format!("LoopParam {:?}", structure.clone()),
+            },
             StructureKey::DirectionalLight { .. } => "DirectionalLight".to_string(),
+            StructureKey::MainDirectionalLight { .. } => "MainDirectionalLight".to_string(),
             StructureKey::AmbientLight { .. } => "AmbientLight".to_string(),
             StructureKey::DistanceFog { .. } => "FogSettings".to_string(),
+            StructureKey::AtmosphereNishita { .. } => "AtmosphereNishita".to_string(),
             StructureKey::BackgroundMusic { .. } => "BackgroundMusic".to_string(),
             StructureKey::SoundEffect { .. } => "SoundEffect".to_string(),
             StructureKey::SpotLight { .. } => "SpotLight".to_string(),
@@ -197,6 +222,7 @@ impl StructureKey {
             StructureKey::ProbabilitySpawn { reference, .. } => Self::extract_tags(reference),
             StructureKey::InPass { reference, .. } => Self::extract_tags(reference),
             StructureKey::Loop { reference, .. } => Self::extract_tags(reference),
+            StructureKey::LoopParam { reference, .. } => Self::extract_tags(reference),
             StructureKey::NestingLoop { reference, .. } => Self::extract_tags(reference),
             StructureKey::NoiseSpawn { reference, .. } => Self::extract_tags(reference),
             StructureKey::PathSpawn { reference, .. } => Self::extract_tags(reference),
@@ -248,11 +274,23 @@ impl StructureKey {
                 StructureKey::DirectionalLight(light) => {
                     world.send_event(DirectionalLightSpawnEvent { light, transform, parent });
                 }
+                StructureKey::MainDirectionalLight(light) => {
+                    world.send_event(MainDirectionalLightSpawnEvent { light, transform, parent });
+                }
                 StructureKey::AmbientLight(light) => {
                     world.send_event(AmbientLightSpawnEvent { light, transform, parent });
                 }
                 StructureKey::DistanceFog(fog) => {
                     world.send_event(DistanceFogSpawnEvent { fog });
+                }
+                StructureKey::AtmosphereNishita { sun_position, rayleigh_multiplier, mie_multiplier, mie_direction, align_to_main_light } => {
+                    world.send_event(AtmosphereNishitaSpawnEvent {
+                        sun_position,
+                        rayleigh_multiplier,
+                        mie_multiplier,
+                        mie_direction,
+                        align_to_main_light,
+                    });
                 }
                 StructureKey::SoundEffect(file) => {
                     world.send_event(SoundEffectSpawnEvent { file });
@@ -280,6 +318,20 @@ impl StructureKey {
                         reference,
                         shift_transform,
                         child_transform,
+                        count,
+                        transform,
+                        parent,
+                    });
+                }
+                StructureKey::LoopParam { reference, origin, rotation, distance, child_position, child_rotation, child_scale, count } => {
+                    world.send_event(LoopParamSpawnEvent {
+                        reference,
+                        origin,
+                        rotation,
+                        distance,
+                        child_position,
+                        child_rotation,
+                        child_scale,
                         count,
                         transform,
                         parent,
@@ -345,6 +397,7 @@ impl StructureKey {
                     world.send_event(InPassSpawnEvent { index, reference, transform, parent });
                 }
                 StructureKey::RandDistDir { reference, dist_min, dist_max, angle_min_deg, angle_max_deg, y } => {
+                    #[cfg(feature = "debug")]
                     println!(
                         "[StructureKey::dispatch_event] Emitting RandDistDir: dist=[{:.2},{:.2}] angle=[{:.1},{:.1}] y={:.2}",
                         dist_min, dist_max, angle_min_deg, angle_max_deg, y

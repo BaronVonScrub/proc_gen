@@ -1,0 +1,27 @@
+(
+    structure_name: "Branch",
+    tags: ["Tree"],
+    data: [
+        (Object(
+            path:"models/Tree/branch.glb#Scene0",
+            collider: Some(
+                ColliderInfo(
+                    collider_type: Cylinder(
+                        half_height: 0.5,
+                        radius: 0.05,
+                    ),
+                    priority: 0,
+                    behaviour: Kinematic,
+                )
+            ),
+            offset: (0.0, 0.0, 0.0),
+            ownership: Team(1),
+            selectable: false,
+            object_type: Terrain,
+        ), (
+            translation: (0.0, 0.0, 0.0),
+            rotation: (0.0, 0.0, 0.0),
+            scale: (1.0, 1.0, 1.0),
+        )),
+    ],
+)

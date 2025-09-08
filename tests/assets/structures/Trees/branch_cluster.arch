@@ -1,0 +1,25 @@
+(
+    structure_name: "Branch Cluster",
+    tags: ["Tree"],
+    data: [
+        (LoopParam(
+            reference: Ref(
+                structure: "Trees/maybe_angled_branch",
+                ownership: Team(1),
+            ),
+            origin: (0.0, 0.0, 0.0),
+            rotation: (0.0, 72.0, 0.0),
+            distance: 0.0,
+            // Per-index modifiers on the child
+            child_position: (0.0, 0.0, 0.0),
+            child_rotation: (0.0, 72.0, 0.0),
+            child_scale: (0.0, 0.0, 0.0),
+            count: 5,
+            ), (
+            // Base container transform (identity)
+            translation: (0.0, 0.0, 0.0),
+            rotation: (0.0, 0.0, 0.0),
+            scale: (1.0, 1.0, 1.0),
+        ))
+    ],
+)

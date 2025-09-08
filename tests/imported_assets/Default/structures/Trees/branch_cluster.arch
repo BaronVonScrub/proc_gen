@@ -1,0 +1,24 @@
+(
+    structure_name: "Branch Cluster",
+    tags: ["Tree"],
+    data: [
+        (NestingLoop(
+            reference: Ref(
+                structure: "Trees/branch_with_leaves",
+                ownership: Team(1),
+            ),
+            // Each iteration: rotate 120° around Y and raise slightly to create a subtle spiral
+            repeated_transform: (
+                translation: (0.0, 0.75, 0.0),
+                rotation: (0.0, 120.0, 0.0),
+                scale: (1.0, 1.0, 1.0),
+            ),
+            count: 3),
+        (
+            // Start one instance at +X, others will be rotated around origin by the loop
+            translation: (3.0, 0.0, 0.0),
+            rotation: (0.0, 0.0, 0.0),
+            scale: (1.0, 1.0, 1.0),
+        ))
+    ],
+)

@@ -1,6 +1,8 @@
 #[allow(unused_variables)]
 
 use bevy::prelude::*;
+#[cfg(feature = "atmosphere")]
+use bevy_atmosphere::prelude::{AtmosphereModel, Nishita};
 use bevy::render::mesh::MeshAabb;
 use bevy_rapier3d::prelude::{ActiveCollisionTypes, ActiveEvents, CollisionEvent, Collider, ContactForceEvent, ContactForceEventThreshold, Damping, Dominance, LockedAxes, RigidBody, Sleeping};
 use oxidized_navigation::NavMeshAffector;
@@ -20,6 +22,115 @@ use crate::core::structure_reference::StructureReference;
 use crate::core::components::MainDirectionalLight;
 use crate::event_system::spawnables::structure::spawn_structure_data;
 use crate::core::tags::Tags;
+use bevy::math::EulerRot;
+
+// In non-debug builds, silence generation logging in this module by shadowing println!/info!
+// This keeps verbose generation output behind the `debug` feature flag without altering call sites.
+#[cfg(not(feature = "debug"))]
+macro_rules! println { ($($arg:tt)*) => {}; }
+
+// Bring in the Bevy log `info!` macro when debug feature is enabled,
+// otherwise define a no-op so the calls compile away in release.
+#[cfg(feature = "debug")]
+use bevy::log::info;
+#[cfg(not(feature = "debug"))]
+macro_rules! info { ($($arg:tt)*) => {}; }
+
+// When present (and true), the sun_position of the Atmosphere Nishita model is aligned each frame to the
+// authored MainDirectionalLight orientation. This resource is authored via .arch through the AtmosphereNishita key.
+#[derive(Resource, Default)]
+pub struct AtmosphereAlignToMainLight(pub bool);
+
+// Set the global AtmosphereModel Nishita parameters from authored data (only when 'atmosphere' feature is enabled)
+#[cfg(feature = "atmosphere")]
+pub fn atmosphere_nishita_spawn_listener(
+    mut commands: Commands,
+    mut reader: EventReader<AtmosphereNishitaSpawnEvent>,
+) {
+    for ev in reader.read() {
+        let mut n = Nishita::default();
+        let sp = ev.sun_position;
+        let len2 = sp.length_squared();
+        n.sun_position = if len2 > 0.0 { sp / len2.sqrt() } else { Vec3::new(0.0, 1.0, 0.0) };
+        // Multiply defaults by provided multipliers
+        let d = Nishita::default();
+        n.rayleigh_coefficient = Vec3::new(
+            d.rayleigh_coefficient.x * ev.rayleigh_multiplier.x,
+            d.rayleigh_coefficient.y * ev.rayleigh_multiplier.y,
+            d.rayleigh_coefficient.z * ev.rayleigh_multiplier.z,
+        );
+        n.mie_coefficient = d.mie_coefficient * ev.mie_multiplier;
+        n.mie_direction = ev.mie_direction;
+        commands.insert_resource(AtmosphereModel::new(n));
+        // Also set (or clear) the alignment preference resource per authored value
+        commands.insert_resource(AtmosphereAlignToMainLight(ev.align_to_main_light));
+    }
+}
+
+pub fn loop_param_spawn_listener(
+    mut commands: Commands,
+    mut reader: EventReader<LoopParamSpawnEvent>,
+    mut activity: ResMut<SpawnActivity>,
+) {
+    let mut processed = false;
+    for event in reader.read() {
+        processed = true;
+        // Container for grouping loop spawns
+        let container = commands
+            .spawn_empty()
+            .insert(Transform::from(event.transform.clone()))
+            .insert(InheritedVisibility::default())
+            .insert(Name::new("LoopParam"))
+            .id();
+
+        if let Some(parent) = event.parent {
+            commands.entity(container).set_parent(parent);
+        }
+
+        // Precompute base vectors
+        let origin = event.origin;
+        let distance = event.distance;
+
+        for i in 0..event.count {
+            let fi = i as f32;
+            // Rotation per index (degrees)
+            let rot_deg = event.rotation * fi;
+            let rot = Quat::from_euler(
+                EulerRot::XYZ,
+                rot_deg.x.to_radians(),
+                rot_deg.y.to_radians(),
+                rot_deg.z.to_radians(),
+            );
+            // Direction is +X rotated by rot
+            let dir = rot * Vec3::X;
+            let base_pos = origin + dir * distance;
+
+            // Child modifiers applied index times
+            let child_pos = event.child_position * fi; // additive per index
+            let child_rot = event.child_rotation * fi; // additive degrees per index
+            // Scale: exponential per-index modifier: (1 + m)^i so m=0 => 1^i = 1 (neutral)
+            let child_scale = Vec3::new(
+                (1.0 + event.child_scale.x).powf(fi),
+                (1.0 + event.child_scale.y).powf(fi),
+                (1.0 + event.child_scale.z).powf(fi),
+            );
+
+            let euler = EulerTransform {
+                translation: (base_pos.x + child_pos.x, base_pos.y + child_pos.y, base_pos.z + child_pos.z),
+                rotation: (child_rot.x, child_rot.y, child_rot.z),
+                scale: (child_scale.x, child_scale.y, child_scale.z),
+            };
+
+            let reference = event.reference.clone();
+            commands.queue(move |world: &mut World| {
+                world.send_event(NestSpawnEvent { reference, transform: euler, parent: Some(container) });
+            });
+        }
+    }
+    if processed { activity.idle_frames = 0; }
+}
+#[cfg(not(feature = "debug"))]
+macro_rules! info { ($($arg:tt)*) => {}; }
 
 // Marker to indicate we've already stripped colliders for a GenerationOnlyCollider subtree
 #[derive(Component, Default)]
@@ -66,14 +177,17 @@ pub fn process_pending_inpass(
         if ev.index == cur.0 {
             any_spawned = true;
             // Derive a label for logging
-            let label = match &ev.reference {
-                StructureReference::Raw { structure, .. } => structure.structure_name.clone(),
-                StructureReference::Ref { structure, .. } => structure.clone(),
-            };
-            println!(
-                "[InPass] spawning index={} structure='{}' parent={:?}",
-                ev.index, label, ev.parent
-            );
+            #[cfg(feature = "debug")]
+            {
+                let label = match &ev.reference {
+                    StructureReference::Raw { structure, .. } => structure.structure_name.clone(),
+                    StructureReference::Ref { structure, .. } => structure.clone(),
+                };
+                println!(
+                    "[InPass] spawning index={} structure='{}' parent={:?}",
+                    ev.index, label, ev.parent
+                );
+            }
             match Structure::try_from(&ev.reference) {
                 Ok(structure) => {
                     let _ = spawn_structure_data(
@@ -535,22 +649,25 @@ pub fn generation_state_driver(
                 stability.no_pending_stable_frames = 0;
                 arming.spawn_done_frames = 0;
                 if generating_frames.frames_in_generating % 30 == 0 {
-                    let gen_cnt = gen_only_pending.iter().count();
-                    let sel_cnt = selective_pending.iter().count();
-                    println!(
-                        "[GenState][Generating] pending: gen_only={} selective={} (holding)",
-                        gen_cnt, sel_cnt
-                    );
+                    #[cfg(feature = "debug")]
+                    {
+                        let gen_cnt = gen_only_pending.iter().count();
+                        let sel_cnt = selective_pending.iter().count();
+                        println!(
+                            "[GenState][Generating] pending: gen_only={} selective={} (holding)",
+                            gen_cnt, sel_cnt
+                        );
+                    }
                 }
                 return;
             } else {
                 stability.no_pending_stable_frames = stability.no_pending_stable_frames.saturating_add(1);
             }
 
-            // Readiness thresholds
-            const MIN_GENERATING_FRAMES: u16 = 30;
-            const REQUIRED_STABLE_FRAMES: u8 = 20;
-            const REQUIRED_IDLE_FRAMES: u8 = 5;
+            // Readiness thresholds (minimal): no min frame wait, 1 stable frame, 1 idle frame
+            const MIN_GENERATING_FRAMES: u16 = 0;
+            const REQUIRED_STABLE_FRAMES: u8 = 1;
+            const REQUIRED_IDLE_FRAMES: u8 = 1;
             // Require at least one observed activity reset before progressing out of Generating.
             let ready = arming.seen_activity
                 && generating_frames.frames_in_generating >= MIN_GENERATING_FRAMES
@@ -582,9 +699,11 @@ pub fn generation_state_driver(
             }
         }
         GenerationState::CollisionResolution => {
-            // increment and move on after N frames
+            // Minimal wait (1 frame) just to flush any leftover contact events, then proceed.
+            const MIN_COLLISION_FRAMES: u16 = 1;
+            const MAX_COLLISION_FRAMES: u16 = 60;  // safety cap
             timer.frames = timer.frames.saturating_add(1);
-            if timer.frames > 60 {
+            if timer.frames >= MIN_COLLISION_FRAMES || timer.frames > MAX_COLLISION_FRAMES {
                 println!("[GenState] CollisionResolution -> NavMeshBuilding");
                 next.set(GenerationState::NavMeshBuilding);
                 timer.frames = 0;
@@ -617,7 +736,8 @@ pub fn reset_generating_phase(
     activity.idle_frames = 0;
     arming.spawn_done_frames = 0;
     arming.seen_activity = false;
-    arming.last_idle_frames = activity.idle_frames;
+    // Initialize high so the first reset to 0 by any spawn listener is detected as a drop
+    arming.last_idle_frames = u8::MAX;
 }
 
 
@@ -698,6 +818,7 @@ pub enum GenerationState {
 #[derive(Resource, Default)]
 pub struct CollisionResolutionTimer {
     pub frames: u16,
+    pub quiet_frames: u16,
 }
 
 // Stability counters to avoid premature transition out of Generating
@@ -910,6 +1031,8 @@ pub fn strip_generation_only_colliders_progressor(
     collider_query: Query<&Collider>,
 ) {
     for (root, mut pending, name_opt) in pending_q.iter_mut() {
+        #[cfg(not(feature = "debug"))]
+        let _ = &name_opt;
         let mut to_visit = Vec::new();
         collect_entity_and_descendants(root, &children_query, &mut to_visit);
         let descendant_count = to_visit.len();
@@ -926,6 +1049,8 @@ pub fn strip_generation_only_colliders_progressor(
 
         if pending.stable_frames >= 3 {
             let mut removed_count = 0usize;
+            #[cfg(not(feature = "debug"))]
+            let _ = &removed_count;
             for e in to_visit.iter().copied() {
                 if collider_query.get(e).is_ok() {
                     commands.entity(e).remove::<Collider>();
@@ -990,7 +1115,6 @@ pub fn mesh_spawn_listener(
                 .insert(Transform::from(event.transform.clone()))
                 .insert(Name::new("Mesh"))
                 .insert(Collider::cuboid(collider_size.x, collider_size.y, collider_size.z))
-                .insert(RigidBody::KinematicPositionBased)
                 .insert(ActiveEvents::COLLISION_EVENTS | ActiveEvents::CONTACT_FORCE_EVENTS)
                 .insert(ActiveCollisionTypes::all())
                 .insert(QueuedNavMeshAffector)
@@ -1069,21 +1193,16 @@ pub fn scene_spawn_listener(
                             entity_commands.insert(Pathfinder {
                                 path: PathState::Ready(start_goal),
                             });
+                            // Units should not affect the navmesh
                         }
-                        ObjectType::Cosmetic => { /* Do nothing */ }
+                        // All other object types, including Cosmetic, should affect the navmesh if they have colliders
                         _ => {
                             entity_commands.insert(QueuedNavMeshAffector);
                         }
                     }
 
-                    match internal_collider.behaviour {
-                        ColliderBehaviour::Dynamic | ColliderBehaviour::GenerationDynamic => {
-                            entity_commands.insert(RigidBody::Dynamic);
-                        }
-                        ColliderBehaviour::Kinematic => {
-                            entity_commands.insert(RigidBody::KinematicPositionBased);
-                        }
-                    }
+                    // Rigid bodies are disabled for now; keep colliders only
+                    let _ = internal_collider.behaviour;
                 }
             }
         }
@@ -1136,52 +1255,54 @@ pub fn spot_light_spawn_listener(
     if processed { activity.idle_frames = 0; }
 }
 
+// Generic directional light spawner: always a regular light, parented under the provided container (if any)
 pub fn directional_light_spawn_listener(
     mut commands: Commands,
     mut reader: EventReader<DirectionalLightSpawnEvent>,
-    existing: Query<Entity, With<MainDirectionalLight>>,
-    parent_tags: Query<&Tags>,
     mut activity: ResMut<SpawnActivity>,
 ) {
     let mut processed = false;
     for event in reader.read() {
         processed = true;
-        // Determine if this should be the main world directional light
-        let is_main = match event.parent {
-            Some(parent) => parent_tags.get(parent).map(|t| t.contains("MainDirectionalLight")).unwrap_or(false),
-            None => true,
-        };
+        let entity = commands
+            .spawn_empty()
+            .insert(event.light.clone())
+            .insert(Transform::from(event.transform.clone()))
+            .insert(InheritedVisibility::default())
+            .insert(Name::new("DirectionalLight"))
+            .id();
+        if let Some(parent) = event.parent {
+            commands.entity(entity).set_parent(parent);
+        }
+    }
+    if processed { activity.idle_frames = 0; }
+}
 
-        // Choose target entity: update existing main if present, else spawn new; non-main always spawns new
-        let mut created_new = false;
-        let target = if is_main {
-            if let Some(e) = existing.iter().next() { e } else { created_new = true; commands.spawn_empty().id() }
-        } else {
-            created_new = true;
-            commands.spawn_empty().id()
-        };
-
-        // Common inserts
+// Dedicated spawner for the single main directional light (sun)
+pub fn main_directional_light_spawn_listener(
+    mut commands: Commands,
+    mut reader: EventReader<MainDirectionalLightSpawnEvent>,
+    existing: Query<Entity, With<MainDirectionalLight>>,
+    mut activity: ResMut<SpawnActivity>,
+) {
+    let mut processed = false;
+    for event in reader.read() {
+        processed = true;
+        let target = existing.iter().next().unwrap_or_else(|| commands.spawn_empty().id());
         let mut ecmd = commands.entity(target);
         ecmd
             .insert(event.light.clone())
-            .insert(Transform::from(event.transform.clone()));
-        if created_new { ecmd.insert(InheritedVisibility::default()); }
-
-        if is_main {
-            // Set up as the main directional light (do not parent under structure container)
-            ecmd
-                .insert(Name::new("MainDirectionalLight"))
-                .insert(CascadeShadowConfig {
-                    bounds: vec![0.0, 30.0, 90.0, 270.0],
-                    overlap_proportion: 0.2,
-                    minimum_distance: 0.0,
-                })
-                .insert(MainDirectionalLight);
-        } else {
-            // Regular directional light, parent under provided container
-            ecmd.insert(Name::new("DirectionalLight"));
-            if let Some(parent) = event.parent { commands.entity(parent).add_child(target); }
+            .insert(Transform::from(event.transform.clone()))
+            .insert(InheritedVisibility::default())
+            .insert(Name::new("MainDirectionalLight"))
+            .insert(CascadeShadowConfig {
+                bounds: vec![0.0, 30.0, 90.0, 270.0],
+                overlap_proportion: 0.2,
+                minimum_distance: 0.0,
+            })
+            .insert(MainDirectionalLight);
+        if let Some(parent) = event.parent {
+            commands.entity(target).set_parent(parent);
         }
     }
     if processed { activity.idle_frames = 0; }
@@ -1948,6 +2069,8 @@ pub fn selective_replacement_progressor(
         );
 
         for (target, name_opt) in chosen {
+            #[cfg(not(feature = "debug"))]
+            let _ = &name_opt;
             println!(
                 "[SelectiveReplacement] Replacing entity {:?} name {:?}",
                 target, name_opt
@@ -2023,6 +2146,8 @@ pub fn collider_priority_despawn_system(
         if let (Ok(pa), Ok(pb)) = (priorities.get(a), priorities.get(b)) {
             let name_a = name_query.get(a).ok().map(|n| n.as_str().to_string());
             let name_b = name_query.get(b).ok().map(|n| n.as_str().to_string());
+            #[cfg(not(feature = "debug"))]
+            { let _ = &name_a; let _ = &name_b; }
             info!(
                 "[PriorityDespawn] ContactForce: {:?}({:?})[{}] <-> {:?}({:?})[{}]",
                 a, name_a, pa.0, b, name_b, pb.0
@@ -2030,6 +2155,8 @@ pub fn collider_priority_despawn_system(
             if pa.0 == pb.0 { continue; }
             let loser = if pa.0 < pb.0 { a } else { b };
             let loser_name = name_query.get(loser).ok().map(|n| n.as_str().to_string());
+            #[cfg(not(feature = "debug"))]
+            { let _ = &loser_name; }
             if already_despawned.insert(loser) {
                 info!("[PriorityDespawn] Despawning lower priority entity: {:?} ({:?})", loser, loser_name);
                 commands.queue(move |world: &mut World| {
@@ -2047,6 +2174,8 @@ pub fn collider_priority_despawn_system(
             if let (Ok(pa), Ok(pb)) = (priorities.get(*a), priorities.get(*b)) {
                 let name_a = name_query.get(*a).ok().map(|n| n.as_str().to_string());
                 let name_b = name_query.get(*b).ok().map(|n| n.as_str().to_string());
+                #[cfg(not(feature = "debug"))]
+                { let _ = &name_a; let _ = &name_b; }
                 info!(
                     "[PriorityDespawn] CollisionStarted: {:?}({:?})[{}] <-> {:?}({:?})[{}]",
                     *a, name_a, pa.0, *b, name_b, pb.0
@@ -2054,6 +2183,8 @@ pub fn collider_priority_despawn_system(
                 if pa.0 == pb.0 { continue; }
                 let loser = if pa.0 < pb.0 { *a } else { *b };
                 let loser_name = name_query.get(loser).ok().map(|n| n.as_str().to_string());
+                #[cfg(not(feature = "debug"))]
+                { let _ = &loser_name; }
                 if already_despawned.insert(loser) {
                     info!("[PriorityDespawn] Despawning lower priority entity: {:?} ({:?})", loser, loser_name);
                     commands.queue(move |world: &mut World| {

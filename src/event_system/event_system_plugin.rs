@@ -14,6 +14,7 @@ impl Plugin for EventSystemPlugin {
         app.init_resource::<GeneratingFrameCounter>();
         app.init_resource::<SpawnActivity>();
         app.init_resource::<GenerationAdvanceArming>();
+        app.init_resource::<NavMeshPriorityThreshold>();
         #[cfg(feature = "debug")]
         {
             app.init_resource::<AllPathsDebug>();
@@ -31,6 +32,8 @@ impl Plugin for EventSystemPlugin {
             .add_event::<DirectionalLightSpawnEvent>()
             .add_event::<AmbientLightSpawnEvent>()
             .add_event::<DistanceFogSpawnEvent>()
+            .add_event::<AtmosphereNishitaSpawnEvent>()
+            .add_event::<MainDirectionalLightSpawnEvent>()
             .add_event::<SoundEffectSpawnEvent>()
             .add_event::<BackgroundMusicSpawnEvent>()
             .add_event::<NestSpawnEvent>()
@@ -39,6 +42,7 @@ impl Plugin for EventSystemPlugin {
             .add_event::<RandSpawnEvent>()
             .add_event::<RandDistDirSpawnEvent>()
             .add_event::<ProbabilitySpawnEvent>()
+            .add_event::<LoopParamSpawnEvent>()
             .add_event::<LoopSpawnEvent>()
             .add_event::<NestingLoopSpawnEvent>()
             .add_event::<NoiseSpawnEvent>()
@@ -56,12 +60,19 @@ impl Plugin for EventSystemPlugin {
             point_light_spawn_listener,
             spot_light_spawn_listener,
             directional_light_spawn_listener,
+            main_directional_light_spawn_listener,
             ambient_light_spawn_listener,
             distance_fog_spawn_listener,
             sound_effect_spawn_listener,
             background_music_spawn_listener,
             nest_spawn_listener,
         ).run_if(in_state(GenerationState::Generating)));
+
+        // Atmosphere events are only processed when the 'atmosphere' feature is enabled
+        #[cfg(feature = "atmosphere")]
+        {
+            app.add_systems(Update, atmosphere_nishita_spawn_listener.run_if(in_state(GenerationState::Generating)));
+        }
 
         // UI overlay update (always on)
         app.add_systems(Update, update_generation_state_overlay);
@@ -82,6 +93,7 @@ impl Plugin for EventSystemPlugin {
             rand_spawn_listener,
             rand_dist_dir_spawn_listener,
             probability_spawn_listener,
+            loop_param_spawn_listener,
             loop_spawn_listener,
             nesting_loop_spawn_listener,
             noise_spawn_listener,

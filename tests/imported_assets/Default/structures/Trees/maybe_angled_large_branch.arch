@@ -1,0 +1,14 @@
+(
+    structure_name: "Maybe Angled Large Branch",
+    tags: ["Tree"],
+    data: [
+        (Choose(list: Ref(
+            structure: "Trees/maybe_angled_large_branch_list",
+            ownership: Team(1),
+        )), (
+            translation: (0.0, 0.0, 0.0),
+            rotation: (0.0, 0.0, 0.0),
+            scale: (1.0, 1.0, 1.0),
+        )),
+    ],
+)

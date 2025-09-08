@@ -65,6 +65,13 @@ pub struct DirectionalLightSpawnEvent {
 }
 
 #[derive(Debug, Clone, Event)]
+pub struct MainDirectionalLightSpawnEvent {
+    pub light: DirectionalLight,
+    pub transform: EulerTransform,
+    pub parent: Option<Entity>,
+}
+
+#[derive(Debug, Clone, Event)]
 pub struct AmbientLightSpawnEvent {
     pub light: AmbientLight,
     pub transform: EulerTransform,
@@ -74,6 +81,15 @@ pub struct AmbientLightSpawnEvent {
 #[derive(Debug, Clone, Event)]
 pub struct DistanceFogSpawnEvent {
     pub fog: DistanceFog,
+}
+
+#[derive(Debug, Clone, Event)]
+pub struct AtmosphereNishitaSpawnEvent {
+    pub sun_position: Vec3,
+    pub rayleigh_multiplier: Vec3,
+    pub mie_multiplier: f32,
+    pub mie_direction: f32,
+    pub align_to_main_light: bool,
 }
 
 #[derive(Debug, Clone, Event)]
@@ -129,6 +145,22 @@ pub struct LoopSpawnEvent {
     pub reference: StructureReference,
     pub shift_transform: EulerTransform,
     pub child_transform: EulerTransform,
+    pub count: usize,
+    pub transform: EulerTransform,
+    pub parent: Option<Entity>,
+}
+
+#[derive(Debug, Clone, Event)]
+pub struct LoopParamSpawnEvent {
+    pub reference: StructureReference,
+    // Per-index placement parameters
+    pub origin: Vec3,        // relative to the loop container (parent)
+    pub rotation: Vec3,      // degrees per index (XYZ applied as EulerRot::XYZ)
+    pub distance: f32,       // distance from origin along +X rotated by rotation*index
+    // Per-index child modifiers (applied index times)
+    pub child_position: Vec3, // additive per index
+    pub child_rotation: Vec3, // additive degrees per index
+    pub child_scale: Vec3,    // multiplicative factor per index (component-wise)
     pub count: usize,
     pub transform: EulerTransform,
     pub parent: Option<Entity>,

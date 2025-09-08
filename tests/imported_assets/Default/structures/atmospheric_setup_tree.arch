@@ -1,0 +1,52 @@
+(
+    structure_name: "Atmospheric Setup (Tree)",
+    tags: [],
+    data: [
+        (MainDirectionalLight((
+            // Warmer sun light
+            color: Srgba((red:1.0,green:0.9,blue:0.75,alpha:1.0)),
+            illuminance: 3000.0,
+            shadows_enabled: true,
+            shadow_depth_bias: 0.02,
+            shadow_normal_bias: 1.8,
+            shadow_map_near_z: 10.0,
+        )), (
+            translation: (0.0, 0.0, 0.0),
+            rotation: (-114.59, 30.0, 0.0),
+            scale: (1.0, 1.0, 1.0),
+        )),
+        (AmbientLight((
+            color: Srgba((red:1.0,green:1.0,blue:1.0,alpha:1.0)),
+            brightness: 350.0,
+        )), (
+            translation: (0.0, 0.0, 0.0),
+            rotation: (0.0, 0.0, 0.0),
+            scale: (1.0, 1.0, 1.0),
+        )),
+        (DistanceFog((
+            color: Srgba((red: 0.83,green: 0.9,blue: 1.0,alpha: 0.8)),
+            falloff: Atmospheric(
+                extinction: Vec3(0.015,0.015,0.015),
+                inscattering: Vec3(0.002,0.002,0.002)
+            ),
+            directional_light_color: Srgba((red: 1.0,green: 0.95,blue: 0.82,alpha: 1.0)),
+            directional_light_exponent: 30.0,
+        )), (
+            translation: (0.0, 0.0, 0.0),
+            rotation: (0.0, 0.0, 0.0),
+            scale: (1.0, 1.0, 1.0),
+        )),
+        (AtmosphereNishita(
+            sun_position: Vec3(0.0, 1.0, 1.0),
+            // Warmer sky by emphasizing longer wavelengths (R,G) relative to B
+            rayleigh_multiplier: Vec3(8.0, 3.0, 0.1),
+            mie_multiplier: 3.0,
+            mie_direction: 0.7,
+            align_to_main_light: false,
+        ), (
+            translation: (0.0, 0.0, 0.0),
+            rotation: (0.0, 0.0, 0.0),
+            scale: (1.0, 1.0, 1.0),
+        ))
+    ],
+)

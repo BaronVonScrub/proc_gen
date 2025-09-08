@@ -32,7 +32,10 @@ pub fn import_structure(structure_name: String) -> Result<Structure, ron::Error>
 
     // Determine candidate roots for assets, depending on where the app was launched from
     let base_path = std::env::current_dir().unwrap();
-    eprintln!("[structure_management] CWD: {}", base_path.display());
+    #[cfg(feature = "debug")]
+    {
+        eprintln!("[structure_management] CWD: {}", base_path.display());
+    }
     let candidates = [
         base_path.join("assets/structures"),
         base_path.join("tests/assets/structures"),
@@ -44,7 +47,10 @@ pub fn import_structure(structure_name: String) -> Result<Structure, ron::Error>
     let mut chosen_path = None;
     for root in candidates.iter() {
         let candidate = root.join(&rel);
-        eprintln!("[structure_management] Trying: {} -> exists: {}", candidate.display(), candidate.exists());
+        #[cfg(feature = "debug")]
+        {
+            eprintln!("[structure_management] Trying: {} -> exists: {}", candidate.display(), candidate.exists());
+        }
         if candidate.exists() {
             chosen_path = Some(candidate);
             break;
@@ -52,7 +58,10 @@ pub fn import_structure(structure_name: String) -> Result<Structure, ron::Error>
     }
 
     let file_path = if let Some(path) = chosen_path {
-        eprintln!("[structure_management] Using structure file: {}", path.display());
+        #[cfg(feature = "debug")]
+        {
+            eprintln!("[structure_management] Using structure file: {}", path.display());
+        }
         path
     } else {
         let tried_paths = candidates

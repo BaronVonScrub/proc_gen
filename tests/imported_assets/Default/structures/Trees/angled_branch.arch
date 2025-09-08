@@ -1,0 +1,14 @@
+(
+    structure_name: "Angled Branch",
+    tags: ["Tree"],
+    data: [
+        (Nest(Ref(
+            structure: "Trees/branch_with_leaves",
+            ownership: Team(1),
+        )), (
+            translation: (0.0, 0.0, 0.0),
+            rotation: (-5.0, 0.0, 5.0),
+            scale: (1.0, 1.0, 1.0),
+        )),
+    ],
+)

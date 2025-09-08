@@ -1,0 +1,30 @@
+(
+    structure_name: "Angled Large Branch List",
+    tags: ["Tree"],
+    data: [
+        (Nest(Ref(
+            structure: "Trees/large_branch",
+            ownership: Team(1),
+        )), (
+            translation: (0.0, 0.0, 0.0),
+            rotation: (0.0, 0.0, -30.0),
+            scale: (1.0, 1.0, 1.0),
+        )),
+        (Nest(Ref(
+            structure: "Trees/large_branch",
+            ownership: Team(1),
+        )), (
+            translation: (0.0, 0.0, 0.0),
+            rotation: (0.0, 0.0, -45.0),
+            scale: (1.0, 1.0, 1.0),
+        )),
+        (Nest(Ref(
+            structure: "Trees/large_branch",
+            ownership: Team(1),
+        )), (
+            translation: (0.0, 0.0, 0.0),
+            rotation: (0.0, 0.0, -60.0),
+            scale: (1.0, 1.0, 1.0),
+        )),
+    ],
+)

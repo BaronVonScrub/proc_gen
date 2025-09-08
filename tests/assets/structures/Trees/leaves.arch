@@ -1,0 +1,26 @@
+(
+    structure_name: "Leaves",
+    tags: ["Tree"],
+    data: [
+        (Object(
+            path:"models/Tree/leaves.glb#Scene0",
+            collider: Some(
+                ColliderInfo(
+                    collider_type: Ball(
+                        radius: 0.4,
+                    ),
+                    priority: 0,
+                    behaviour: Kinematic,
+                )
+            ),
+            offset: (0.0, 0.0, 0.0),
+            ownership: Team(1),
+            selectable: false,
+            object_type: Terrain,
+        ), (
+            translation: (0.0, 0.0, 0.0),
+            rotation: (0.0, 0.0, 0.0),
+            scale: (1.0, 1.0, 1.0),
+        )),
+    ],
+)

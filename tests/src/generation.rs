@@ -1,5 +1,5 @@
 use bevy::prelude::{Commands, Mesh, Vec2};
-use bevy_math::primitives::Circle;
+use bevy_math::primitives::{Circle, Rectangle};
 use proc_gen::core::tmaterial::TMaterial;
 use proc_gen::spawning::euler_transform::EulerTransform;
 use proc_gen::spawn;
@@ -22,34 +22,103 @@ use proc_gen::event_system::event_listeners::AllPathsDebug;
 pub(crate) struct GeneratedRoot;
 
 fn send_generation_events(c: &mut Commands, parent: Option<Entity>) {
-    spawn!(c, StructureSpawnEvent {
-        structure: "atmospheric_setup".to_string(),
-        transform: Default::default(),
-        parent,
-    });
 
-    spawn!(c, StructureSpawnEvent {
-        structure: "Castle/castle_with_trees".to_string(),
-        transform: Default::default(),
-        parent,
-    });
+    // CFG guard: Feature "castle"
+    #[cfg(feature = "castle")]
+    {
+        // Always spawn baseline atmosphere/lighting setup
+        spawn!(c, StructureSpawnEvent {
+            structure: "atmospheric_setup_castle".to_string(),
+            transform: Default::default(),
+            parent,
+        });
 
-    spawn!(c, MeshSpawnEvent {
-        mesh: Mesh::from(Circle::new(11.0))
-            .with_generated_tangents()
-            .unwrap(),
-        transform: EulerTransform {
-            translation: (0.0, 0.0, 0.0),
-            // Circle lies in XY plane by default; rotate -90deg around X to place it on XZ ground
-            rotation: (-90.0, 0.0, 0.0),
-            scale: (1.0, 1.0, 1.0),
-        },
-        material: TMaterial::TiledMaterial {
-            material_name: "Grass".to_string(),
-            tiling_factor: Vec2::new(5.0, 5.0),
-        },
-        parent,
-    });
+        spawn!(c, StructureSpawnEvent {
+            structure: "Castle/castle_with_trees".to_string(),
+            transform: Default::default(),
+            parent,
+        });
+
+        spawn!(c, MeshSpawnEvent {
+            mesh: Mesh::from(Circle::new(11.0))
+                .with_generated_tangents()
+                .unwrap(),
+            transform: EulerTransform {
+                translation: (0.0, 0.0, 0.0),
+                // Circle lies in XY plane by default; rotate -90deg around X to place it on XZ ground
+                rotation: (-90.0, 0.0, 0.0),
+                scale: (1.0, 1.0, 1.0),
+            },
+            material: TMaterial::TiledMaterial {
+                material_name: "Grass".to_string(),
+                tiling_factor: Vec2::new(5.0, 5.0),
+            },
+            parent,
+        });
+    }
+
+    // CFG guard: Feature "tree" (spawn demo branch-with-leaves when castle is not enabled)
+    #[cfg(all(feature = "tree", not(feature = "castle")))]
+    {
+        // Basic atmosphere for tree-only scene (reuse castle setup for now)
+        spawn!(c, StructureSpawnEvent {
+            structure: "atmospheric_setup_tree".to_string(),
+            transform: Default::default(),
+            parent,
+        });
+
+        // Demo branch with leaves
+        spawn!(c, StructureSpawnEvent {
+            structure: "Trees/massive_branch".to_string(),
+            transform: Default::default(),
+            parent,
+        });
+
+        spawn!(c, MeshSpawnEvent {
+            mesh: Mesh::from(Circle::new(11.0))
+                .with_generated_tangents()
+                .unwrap(),
+            transform: EulerTransform {
+                translation: (0.0, 0.0, 0.0),
+                // Circle lies in XY plane by default; rotate -90deg around X to place it on XZ ground
+                rotation: (-90.0, 0.0, 0.0),
+                scale: (0.6, 0.6, 0.6),
+            },
+            material: TMaterial::TiledMaterial {
+                material_name: "Grass".to_string(),
+                tiling_factor: Vec2::new(2.0, 2.0),
+            },
+            parent,
+        });
+    }
+
+    // CFG guard: Feature "map"
+    #[cfg(feature = "map")]
+    {
+        // Minimal atmosphere/lighting for map scenario
+        spawn!(c, StructureSpawnEvent {
+            structure: "atmospheric_setup_map".to_string(),
+            transform: Default::default(),
+            parent,
+        });
+
+        // Square ground plane (Rectangle in XY, rotate -90deg around X to lie on XZ)
+        spawn!(c, MeshSpawnEvent {
+            mesh: Mesh::from(Rectangle::new(24.0, 24.0))
+                .with_generated_tangents()
+                .unwrap(),
+            transform: EulerTransform {
+                translation: (0.0, 0.0, 0.0),
+                rotation: (-90.0, 0.0, 0.0),
+                scale: (1.0, 1.0, 1.0),
+            },
+            material: TMaterial::TiledMaterial {
+                material_name: "Grass".to_string(),
+                tiling_factor: Vec2::new(6.0, 6.0),
+            },
+            parent,
+        });
+    }
 }
 
 pub(crate) fn generate_map(mut c: Commands) {

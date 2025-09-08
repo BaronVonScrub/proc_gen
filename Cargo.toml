@@ -44,7 +44,7 @@ bevy_egui = "0.33.0"
 rand = { version = "0.8.5", features = [] }
 wasm-bindgen = { version = "0.2.89", features = [] }
 egui_extras = { version = "0.31.0", features = ["all_loaders"]}
-bevy_atmosphere = "0.12.2"
+bevy_atmosphere = { version = "0.12.2", optional = true }
 indexmap = "2.1.0"
 bevy_asset_loader = "0.22.0"
 rand_core = "0.9.2"
@@ -83,6 +83,7 @@ path = "src/lib.rs"
 [features]
 test = []
 debug = ["bevy_rapier3d/debug-render"]
+atmosphere = ["dep:bevy_atmosphere"]
 
 [workspace]
 members = ["tests"]

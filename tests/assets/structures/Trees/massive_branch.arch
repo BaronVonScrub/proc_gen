@@ -1,0 +1,43 @@
+(
+    structure_name: "Massive Branch",
+    tags: ["Tree"],
+    data: [
+        // Central trunk/branch
+        (Nest(Ref(
+            structure: "Trees/branch",
+            ownership: Team(1),
+        )), (
+            translation: (0.0, 0.0, 0.0),
+            rotation: (0.0, 0.0, 0.0),
+            scale: (1.0, 1.0, 1.0),
+        )),
+
+        // Three branch clusters spaced along the length (Y axis)
+        (LoopParam(
+            reference: Ref(
+                structure: "Trees/maybe_angled_large_branch",
+                ownership: Team(1),
+            ),
+            origin: (0.0, 1.5, 0.0),      // first cluster position on trunk
+            rotation: (0.0, 0.0, 0.0),    // no per-index yaw/pitch/roll
+            distance: 0.0,                // place at origin; spacing handled by child_position
+            child_position: (0.0, 0.3, 0.0), // move +2.0 on Y per index -> y = 2, 4, 6
+            child_rotation: (0.0, 222.0, 0.0), // no additional per-index rotation
+            child_scale: (-0.05, -0.05, -0.05),    // no per-index scaling
+            count: 12,
+        ), (
+            translation: (0.0, 0.0, 0.0),
+            rotation: (0.0, 0.0, 0.0),
+            scale: (0.8, 0.8, 0.8),
+        )),
+        // Top angled branch
+        (Nest(Ref(
+            structure: "Trees/maybe_angled_large_branch",
+            ownership: Team(1),
+        )), (
+            translation: (0.0, 4.5, 0.0),
+            rotation: (0.0, 0.0, 0.0),
+            scale: (0.4, 0.4, 0.4),
+        )),
+    ],
+) 
