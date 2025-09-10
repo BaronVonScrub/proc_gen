@@ -14,7 +14,7 @@
                             collider: Some(
                                 ColliderInfo(
                                     collider_type: Cuboid(
-                                        hx: 0.3,
+                                        hx: 1.0,
                                         hy: 0.1,
                                         hz: 0.3,
                                     ),
@@ -26,6 +26,7 @@
                             ownership: Team(1),
                             selectable: false,
                             object_type: Building,
+                            visibility: Some(Hidden),
                         ), (
                             translation: (0.0, -0.03, 0.0),
                             rotation: (0.0, 90.0, 0.0),

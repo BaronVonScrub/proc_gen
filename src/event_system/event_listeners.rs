@@ -22,12 +22,102 @@ use crate::core::structure_reference::StructureReference;
 use crate::core::components::MainDirectionalLight;
 use crate::event_system::spawnables::structure::spawn_structure_data;
 use crate::core::tags::Tags;
+use crate::core::components::{PathPolyline, PathPolylineList};
 use bevy::math::EulerRot;
+use crate::materials::path_blend::{GroundPathMaterial, PathBlendMaterial, PathBlendParams, make_path_blend_material};
+use bevy_pbr::StandardMaterial;
 
 // In non-debug builds, silence generation logging in this module by shadowing println!/info!
 // This keeps verbose generation output behind the `debug` feature flag without altering call sites.
 #[cfg(not(feature = "debug"))]
 macro_rules! println { ($($arg:tt)*) => {}; }
+
+// Buffer for PathSpawnEvent produced during PathResolve; these will be flushed in the next Generating
+#[derive(Resource, Default)]
+pub struct ResolvedPathSpawns(pub Vec<PathSpawnEvent>);
+
+// Apply all stored polylines from any PathPolylineList entity to any PathBlend material
+// whose entity shares at least one matching tag. Each list is applied independently,
+// and segments are built per-polyline without connecting across polylines.
+pub fn apply_stored_polylines_to_tagged_pathblend(
+    lists: Query<(&Tags, &PathPolylineList)>,
+    targets: Query<(&Tags, &MeshMaterial3d<PathBlendMaterial>)>,
+    mut mats: ResMut<Assets<PathBlendMaterial>>,
+) {
+    let mut total_targets = 0usize;
+    let mut total_polylines = 0usize;
+    for (list_tags, list) in &lists {
+        // Count polylines in this list
+        let list_poly_count = list.0.len();
+        if list_poly_count == 0 { continue; }
+        // For each target, apply if any tag matches
+        for (t_tags, mat_handle) in &targets {
+            let mut matches = false;
+            'outer: for lt in &list_tags.0 {
+                for tt in &t_tags.0 { if lt == tt { matches = true; break 'outer; } }
+            }
+            if !matches { continue; }
+            if let Some(mat) = mats.get_mut(&mat_handle.0) {
+                mat.extension.params.set_segments_from_polylines(&list.0);
+                total_targets += 1;
+                total_polylines += list_poly_count;
+                eprintln!(
+                    "[PathBlend] Applied {} stored polylines to tagged target; total segments now {}",
+                    list_poly_count,
+                    mat.extension.params.flags.z
+                );
+            } else {
+                eprintln!("[PathBlend] Target PathBlendMaterial handle not found while applying stored polylines");
+            }
+        }
+    }
+    if total_targets > 0 {
+        eprintln!("[PathBlend] Applied stored polylines to {} target(s) ({} polylines)", total_targets, total_polylines);
+    }
+}
+
+// Apply published world-space path points into the ground PathBlend material
+pub fn apply_world_path_points_to_material(
+    mut reader: EventReader<PathWorldPointsEvent>,
+    mut mats: ResMut<Assets<PathBlendMaterial>>,
+    target: Option<Res<GroundPathMaterial>>,
+) {
+    let Some(target) = target else {
+        eprintln!("[PathBlend] GroundPathMaterial resource not yet available; skipping PathWorldPointsEvent(s)");
+        return;
+    };
+    let Some(handle) = &target.0 else {
+        eprintln!("[PathBlend] GroundPathMaterial handle not set yet; skipping PathWorldPointsEvent(s)");
+        return;
+    };
+    if let Some(mat) = mats.get_mut(handle) {
+        // Collect each event's polyline and then set all segments at once, without connecting between polylines
+        let mut polylines: Vec<Vec<Vec3>> = Vec::new();
+        let mut total_points = 0usize;
+        let mut events = 0usize;
+        for ev in reader.read() {
+            eprintln!("[PathBlend] Applying PathWorldPointsEvent with {} points:", ev.points.len());
+            for (i, p) in ev.points.iter().enumerate() {
+                eprintln!("  [World][{}] {:?}", i, p);
+            }
+            if ev.points.len() >= 2 { polylines.push(ev.points.clone()); }
+            total_points += ev.points.len();
+            events += 1;
+        }
+        if !polylines.is_empty() {
+            mat.extension.params.set_segments_from_polylines(&polylines);
+            eprintln!(
+                "[PathBlend] Applied {} PathWorldPointsEvent(s) ({} polylines, {} points); total segments now {}",
+                events,
+                polylines.len(),
+                total_points,
+                mat.extension.params.flags.z
+            );
+        }
+    } else {
+        eprintln!("[PathBlend] PathBlendMaterial handle not found in asset storage");
+    }
+}
 
 // Bring in the Bevy log `info!` macro when debug feature is enabled,
 // otherwise define a no-op so the calls compile away in release.
@@ -126,6 +216,269 @@ pub fn loop_param_spawn_listener(
                 world.send_event(NestSpawnEvent { reference, transform: euler, parent: Some(container) });
             });
         }
+    }
+    if processed { activity.idle_frames = 0; }
+}
+
+// On entering Generating, flush any PathSpawnEvent captured during PathResolve
+pub fn flush_resolved_paths_on_enter_generating(
+    mut resolved: ResMut<ResolvedPathSpawns>,
+    mut commands: Commands,
+) {
+    if resolved.0.is_empty() { return; }
+    println!("[PathBuffer] Flushing {} buffered PathSpawnEvent(s) to Generating", resolved.0.len());
+    let to_send = std::mem::take(&mut resolved.0);
+    commands.queue(move |world: &mut World| {
+        for ev in to_send.into_iter() {
+            println!("[PathBuffer] -> emit PathSpawnEvent: points={}, parent={:?}", ev.points.len(), ev.parent);
+            world.send_event(ev);
+        }
+    });
+}
+
+// Variant: path to ALL entities that have the given tag, emitting one PathSpawnEvent per target
+pub fn path_to_all_tags_spawn_listener(
+    mut commands: Commands,
+    mut reader: EventReader<PathToAllTagsSpawnEvent>,
+    tag_query: Query<(&GlobalTransform, &Tags)>,
+    nav_mesh: Option<Res<oxidized_navigation::NavMesh>>,
+    settings: Option<Res<oxidized_navigation::NavMeshSettings>>,
+    active_tasks: Option<Res<oxidized_navigation::ActiveGenerationTasks>>,
+    #[cfg(feature = "debug")] mut all_dbg: ResMut<AllPathsDebug>,
+    parent_query: Query<&GlobalTransform>,
+    mut activity: ResMut<SpawnActivity>,
+    store_query: Query<(Entity, &Tags)>,
+    mut resolved: ResMut<ResolvedPathSpawns>,
+    mut highest: ResMut<HighestPassIndex>,
+    cur_pass: Option<Res<CurrentPass>>,
+) {
+    let mut processed = false;
+    for event in reader.read() {
+        // If navmesh is still baking, defer deterministically
+        if let Some(tasks) = active_tasks.as_ref() {
+            if !tasks.is_empty() {
+                let ev = event.clone();
+                commands.queue(move |world: &mut World| { world.send_event(ev); });
+                continue;
+            }
+        }
+        // Compute world-space base transform for this event
+        let local_tf = Transform::from(event.transform.clone());
+        let world_tf = match event.parent.and_then(|p| parent_query.get(p).ok()) {
+            Some(parent_gt) => parent_gt.compute_transform() * local_tf,
+            None => local_tf,
+        };
+        let base = world_tf.translation;
+
+        // Eagerly ensure a storage holder exists if store_as was provided, even before paths resolve
+        if let Some(label) = event.store_as.as_ref() {
+            let existing = store_query.iter().find(|(_, t)| t.contains(label)).map(|(e, _)| e);
+            if existing.is_none() {
+                let e = commands
+                    .spawn_empty()
+                    .insert(PathPolylineList::default())
+                    .insert(Tags(vec![label.clone()]))
+                    .insert(Name::new(format!("PathPolylineList: {}", label)))
+                    .id();
+                if let Some(parent) = event.parent { commands.entity(e).set_parent(parent); }
+                eprintln!("[PathStore] Created holder 'PathPolylineList: {}' under parent {:?}", label, event.parent);
+            }
+        }
+
+        // Collect all end positions with the requested tag
+        let mut targets: Vec<Vec3> = Vec::new();
+        for (gt, tags) in tag_query.iter() {
+            if tags.0.iter().any(|t| t == &event.tag) { targets.push(gt.translation()); }
+        }
+        if targets.is_empty() {
+            println!("[PathToAllTags] No entities found with tag '{}' yet; will retry next frame", event.tag);
+            let ev = event.clone();
+            commands.queue(move |world: &mut World| { world.send_event(ev); });
+            continue;
+        }
+
+        let (Some(nav_mesh), Some(settings)) = (nav_mesh.as_ref(), settings.as_ref()) else {
+            println!("[PathToAllTags] NavMesh/Settings not available yet; will retry next frame");
+            let ev = event.clone();
+            commands.queue(move |world: &mut World| { world.send_event(ev); });
+            continue;
+        };
+
+        // For each target, build a path and enqueue a PathSpawnEvent
+        if let Ok(tiles) = nav_mesh.get().read() {
+            // Helper that captures tiles/settings without naming the private NavMeshTiles type
+            let try_between = |s: Vec3, e: Vec3| -> Option<Vec<Vec3>> {
+                match oxidized_navigation::query::find_path(&tiles, &settings, s, e, None, None) {
+                    Ok(points) if points.len() >= 2 => Some(points),
+                    _ => None,
+                }
+            };
+            for end_pos_raw in targets {
+                // Rotate local start by world rotation; snap Y to end plane
+                let mut start_world = base + world_tf.rotation * event.start;
+                start_world.y = end_pos_raw.y + 0.05;
+                let end_pos = end_pos_raw;
+
+                // Build path points (optionally with manual checkpoints)
+                let mut path_points: Vec<Vec3> = Vec::new();
+                if let Some(local_points) = &event.manual_points {
+                    let mut world_manual: Vec<Vec3> = Vec::with_capacity(local_points.len());
+                    for lp in local_points.iter() {
+                        let mut wp = base + world_tf.rotation * *lp;
+                        wp.y = end_pos.y + 0.05;
+                        world_manual.push(wp);
+                    }
+                    let nav_start = world_manual.last().copied().unwrap_or(start_world);
+                    let base_path = match try_between(nav_start, end_pos) {
+                        Some(p) => p,
+                        None => {
+                            let radii = [0.15f32, 0.3, 0.45, 0.6, 0.8, 1.0];
+                            let mut found: Option<Vec<Vec3>> = None;
+                            'outer_bp: for r in radii.into_iter() {
+                                let steps = 16;
+                                for i in 0..steps {
+                                    let theta = (i as f32) * std::f32::consts::TAU / (steps as f32);
+                                    let cand = Vec3::new(nav_start.x + r * theta.cos(), nav_start.y, nav_start.z + r * theta.sin());
+                                    if let Some(p) = try_between(cand, end_pos) { found = Some(p); break 'outer_bp; }
+                                }
+                            }
+                            match found { Some(p) => p, None => continue } // skip this target this frame
+                        }
+                    };
+                    path_points.clear();
+                    path_points.push(start_world);
+                    path_points.extend(world_manual.into_iter());
+                    if base_path.len() > 1 { path_points.extend_from_slice(&base_path[1..]); }
+                } else {
+                    if let Some(points) = try_between(start_world, end_pos) {
+                        path_points = points;
+                    } else {
+                        // Probe around start
+                        let radii = [0.15f32, 0.3, 0.45, 0.6, 0.8, 1.0];
+                        let mut found = None;
+                        'outer: for r in radii.into_iter() {
+                            let steps = 16;
+                            for i in 0..steps {
+                                let theta = (i as f32) * std::f32::consts::TAU / (steps as f32);
+                                let cand = Vec3::new(start_world.x + r * theta.cos(), start_world.y, start_world.z + r * theta.sin());
+                                if let Some(points) = try_between(cand, end_pos) { found = Some(points); break 'outer; }
+                            }
+                        }
+                        match found { Some(points) => { path_points = points; }, None => continue }
+                    }
+                }
+
+                // Log all computed world-space points before further processing/storage
+        if !path_points.is_empty() {
+            println!("[PathToTag] World polyline ({} points):", path_points.len());
+            for (i, p) in path_points.iter().enumerate() {
+                println!("  [World][{}] {:?}", i, p);
+            }
+        }
+        if path_points.len() < 2 { continue; }
+
+                // Optional wobble (same approach as single-target variant)
+                let wobble_prefix_len: usize = match &event.manual_points { Some(lps) => lps.len(), None => 0 };
+                if let Some(wob) = event.wobble.as_ref() {
+                    if path_points.len() >= 2 && wob.checkpoint_spacing > 0.01 && wob.wavelength > 0.01 {
+                        // Precompute segment lengths and cumulative arclengths
+                        let mut seg_lengths: Vec<f32> = Vec::with_capacity(path_points.len() - 1);
+                        let mut cum: Vec<f32> = Vec::with_capacity(path_points.len());
+                        cum.push(0.0);
+                        for w in path_points.windows(2) {
+                            let l = w[1].distance(w[0]);
+                            seg_lengths.push(l);
+                            cum.push(cum.last().copied().unwrap_or(0.0) + l);
+                        }
+                        let total_len = *cum.last().unwrap_or(&0.0);
+                        let s_start = if wobble_prefix_len < cum.len() { cum[wobble_prefix_len] } else { 0.0 };
+                        if wobble_prefix_len < path_points.len() {
+                            let sample_at = |s: f32| -> (Vec3, Vec3) {
+                                let mut s_rem = s.clamp(0.0, total_len);
+                                for (i, &l) in seg_lengths.iter().enumerate() {
+                                    if l <= 1e-5 { continue; }
+                                    if s_rem <= l {
+                                        let t = s_rem / l;
+                                        let p0 = path_points[i];
+                                        let p1 = path_points[i+1];
+                                        let pos = p0.lerp(p1, t);
+                                        let mut tan = p1 - p0; tan.y = 0.0; let tan = tan.normalize_or_zero();
+                                        return (pos, if tan.length_squared() < 1.0e-8 { Vec3::X } else { tan });
+                                    }
+                                    s_rem -= l;
+                                }
+                                let last = path_points.last().copied().unwrap();
+                                let prev = path_points[path_points.len()-2];
+                                let mut tan = last - prev; tan.y = 0.0; let tan = tan.normalize_or_zero();
+                                (last, if tan.length_squared() < 1.0e-8 { Vec3::X } else { tan })
+                            };
+
+                            let mut amp = wob.amplitude;
+                            for _attempt in 0..3 {
+                                let mut checkpoints: Vec<Vec3> = Vec::new();
+                                checkpoints.push(path_points[wobble_prefix_len]);
+                                let mut s = (s_start + wob.checkpoint_spacing).min(total_len);
+                                let mut made_offset = false;
+                                while s < total_len - 1.0e-3 {
+                                    let (base_p, tan) = sample_at(s);
+                                    let side = Vec3::Y.cross(tan).normalize_or_zero();
+                                    let offset = amp * (std::f32::consts::TAU * s / wob.wavelength + wob.phase).sin();
+                                    let mut cp = base_p + side * offset; cp.y = base_p.y; checkpoints.push(cp);
+                                    made_offset = true; s += wob.checkpoint_spacing;
+                                }
+                                if !made_offset {
+                                    let mid = (s_start + total_len) * 0.5;
+                                    if mid > s_start + 1e-4 && mid < total_len - 1e-4 {
+                                        let (base_p, tan) = sample_at(mid);
+                                        let side = Vec3::Y.cross(tan).normalize_or_zero();
+                                        let offset = amp * (std::f32::consts::TAU * mid / wob.wavelength + wob.phase).sin();
+                                        let mut cp = base_p + side * offset; cp.y = base_p.y; checkpoints.push(cp);
+                                    }
+                                }
+                                checkpoints.push(path_points.last().copied().unwrap());
+
+                                let mut new_path: Vec<Vec3> = Vec::new();
+                                if wobble_prefix_len > 0 { new_path.extend_from_slice(&path_points[..=wobble_prefix_len]); }
+                                else { new_path.push(path_points[0]); }
+
+                                let mut ok = true;
+                                for w in checkpoints.windows(2) {
+                                    match oxidized_navigation::query::find_path(&tiles, &settings, w[0], w[1], None, None) {
+                                        Ok(sub) if sub.len() >= 2 => { new_path.extend_from_slice(&sub[1..]); }
+                                        _ => { ok = false; break; }
+                                    }
+                                }
+                                if ok && new_path.len() >= 2 { path_points = new_path; break; }
+                                else { amp *= 0.5; }
+                            }
+                        }
+                    }
+                }
+
+                // Debug store
+                #[cfg(feature = "debug")] {
+                    all_dbg.paths.push(path_points.clone());
+                    if all_dbg.paths.len() > 256 { all_dbg.paths.remove(0); }
+                }
+
+                // Convert to local points for the container and enqueue PathSpawnEvent
+                let inv_world = world_tf.compute_matrix().inverse();
+                let local_points: Vec<Vec3> = path_points.iter().map(|p| inv_world.transform_point3(*p)).collect();
+
+                let reference = event.reference.clone();
+                let tension = event.tension;
+                let spread = event.spread.clone();
+                let count = event.count;
+                let transform = event.transform.clone();
+                let parent = event.parent;
+                let points_len = local_points.len();
+                resolved.0.push(PathSpawnEvent { reference, points: local_points, tension, spread, count, transform, parent });
+                println!("[PathBuffer] Buffered PathSpawnEvent (to_all): points={}, parent={:?}", points_len, parent);
+                if let Some(cp) = cur_pass.as_ref() { if highest.0 < cp.0.saturating_add(1) { highest.0 = cp.0.saturating_add(1); } }
+            }
+        }
+
+        processed = true;
     }
     if processed { activity.idle_frames = 0; }
 }
@@ -279,12 +632,25 @@ pub fn path_to_tag_spawn_listener(
     tag_query: Query<(&GlobalTransform, &Tags)>,
     nav_mesh: Option<Res<oxidized_navigation::NavMesh>>,
     settings: Option<Res<oxidized_navigation::NavMeshSettings>>,
+    active_tasks: Option<Res<oxidized_navigation::ActiveGenerationTasks>>,
     #[cfg(feature = "debug")] mut all_dbg: ResMut<AllPathsDebug>,
     parent_query: Query<&GlobalTransform>,
     mut activity: ResMut<SpawnActivity>,
+    store_query: Query<(Entity, &Tags)>,
+    mut resolved: ResMut<ResolvedPathSpawns>,
+    mut highest: ResMut<HighestPassIndex>,
+    cur_pass: Option<Res<CurrentPass>>,
 ) {
     let mut processed = false;
     for event in reader.read() {
+        // If navmesh is still baking, defer deterministically
+        if let Some(tasks) = active_tasks.as_ref() {
+            if !tasks.is_empty() {
+                let ev = event.clone();
+                commands.queue(move |world: &mut World| { world.send_event(ev); });
+                continue;
+            }
+        }
         // Only mark processed when we actually succeed in producing a path
         // Compute world-space base transform for this event: parent GlobalTransform * local Transform
         let local_tf = Transform::from(event.transform.clone());
@@ -293,6 +659,20 @@ pub fn path_to_tag_spawn_listener(
             None => local_tf,
         };
         let base = world_tf.translation;
+
+        // Eagerly ensure a storage holder exists if store_as was provided, even before a path resolves
+        if let Some(label) = event.store_as.as_ref() {
+            let existing = store_query.iter().find(|(_, t)| t.contains(label)).map(|(e, _)| e);
+            if existing.is_none() {
+                let e = commands
+                    .spawn_empty()
+                    .insert(PathPolylineList::default())
+                    .insert(Tags(vec![label.clone()]))
+                    .insert(Name::new(format!("PathPolylineList: {}", label)))
+                    .id();
+                if let Some(parent) = event.parent { commands.entity(e).set_parent(parent); }
+            }
+        }
 
         // Find nearest entity with the requested tag
         let mut best: Option<(Vec3, f32)> = None; // (position, dist2)
@@ -331,7 +711,6 @@ pub fn path_to_tag_spawn_listener(
             // Base start position rotated into world, then snapped near end's Y plane
             let mut start_world = base + world_tf.rotation * event.start;
             start_world.y = end_pos.y + 0.05;
-            println!("[PathToTag] Using start_world={:?}, end_pos={:?}", start_world, end_pos);
 
             // Helper to compute a path between arbitrary points
             let try_between = |s: Vec3, e: Vec3| -> Option<Vec<Vec3>> {
@@ -387,7 +766,7 @@ pub fn path_to_tag_spawn_listener(
                         match found {
                             Some(p) => p,
                             None => {
-                                println!("[PathToTag] Base path failed with manual_points; will retry next frame");
+                                // Could not find a valid base path yet; requeue and try again next frame
                                 let ev = event.clone();
                                 commands.queue(move |world: &mut World| { world.send_event(ev); });
                                 continue;
@@ -430,9 +809,10 @@ pub fn path_to_tag_spawn_listener(
                         println!("[PathToTag] Probing succeeded; path points: {:?}", points);
                         path_points = points;
                     } else {
-                        println!("[PathToTag] NoValidStartPolygon near start; will retry next frame");
+                        // Could not find a valid start polygon yet; requeue silently and try again
                         let ev = event.clone();
                         commands.queue(move |world: &mut World| { world.send_event(ev); });
+                        continue;
                     }
                 }
             }
@@ -604,16 +984,54 @@ pub fn path_to_tag_spawn_listener(
             .map(|p| inv_world.transform_point3(*p))
             .collect();
 
-        // Forward to PathSpawnEvent so existing logic handles instantiation and sampling
+        // Buffer PathSpawnEvent so it materializes during the next Generating pass
         let reference = event.reference.clone();
         let tension = event.tension;
         let spread = event.spread.clone();
         let count = event.count;
         let transform = event.transform.clone();
         let parent = event.parent;
+        let points_len = local_points.len();
+        println!("[PathBuffer] Buffered PathSpawnEvent: points={}, parent={:?}", points_len, parent);
+        resolved.0.push(PathSpawnEvent { reference, points: local_points, tension, spread, count, transform, parent });
+        if let Some(cp) = cur_pass.as_ref() { if highest.0 < cp.0.saturating_add(1) { highest.0 = cp.0.saturating_add(1); } }
+        // Also publish the world-space polyline so materials can visualize it
+        let world_points = path_points.clone();
         commands.queue(move |world: &mut World| {
-            world.send_event(PathSpawnEvent { reference, points: local_points, tension, spread, count, transform, parent });
+            world.send_event(PathWorldPointsEvent { points: world_points });
         });
+
+        // If requested, append each computed polyline into a list labeled with `store_as`
+        if let Some(label) = event.store_as.as_ref() {
+            // Find or create a holder entity with this tag
+            let holder = if let Some((entity, _)) = store_query.iter().find(|(_, t)| t.contains(label)) {
+                entity
+            } else {
+                let e = commands
+                    .spawn_empty()
+                    .insert(PathPolylineList::default())
+                    .insert(Tags(vec![label.clone()]))
+                    .insert(Name::new(format!("PathPolylineList: {}", label)))
+                    .id();
+                if let Some(parent) = event.parent { commands.entity(e).set_parent(parent); }
+                eprintln!("[PathStore] Created holder late 'PathPolylineList: {}' under parent {:?}", label, event.parent);
+                e
+            };
+            // Append into the list using a queued world access to mutate the component safely
+            let to_add = path_points.clone();
+            let label_clone = label.clone();
+            commands.queue(move |world: &mut World| {
+                let mut ent = world.entity_mut(holder);
+                if let Some(mut list) = ent.get_mut::<PathPolylineList>() {
+                    list.0.push(to_add);
+                    eprintln!("[PathStore] Appended polyline to 'PathPolylineList: {}' (now {} polylines)", label_clone, list.0.len());
+                } else {
+                    ent.insert(PathPolylineList(vec![to_add]));
+                    eprintln!("[PathStore] Inserted new PathPolylineList with 1 polyline into holder 'PathPolylineList: {}'", label_clone);
+                }
+            });
+        }
+
         processed = true;
     }
     if processed { activity.idle_frames = 0; }
@@ -634,6 +1052,9 @@ pub fn generation_state_driver(
     mut arming: ResMut<GenerationAdvanceArming>,
     // For NavMeshBuilding completion check
     active_tasks: Option<Res<oxidized_navigation::ActiveGenerationTasks>>,
+    // For pass-gated pending work
+    pending_inpass: Res<PendingInPass>,
+    cur_pass: Res<CurrentPass>,
 ) {
     match *state.get() {
         GenerationState::Generating => {
@@ -644,7 +1065,9 @@ pub fn generation_state_driver(
             }
             arming.last_idle_frames = activity.idle_frames;
             // Pending work check updates stability
-            let any_pending = !gen_only_pending.is_empty() || !selective_pending.is_empty();
+            // Also gate on any InPass items for the current pass that haven't been processed yet.
+            let any_inpass_current = pending_inpass.0.iter().any(|ev| ev.index == cur_pass.0);
+            let any_pending = !gen_only_pending.is_empty() || !selective_pending.is_empty() || any_inpass_current;
             if any_pending {
                 stability.no_pending_stable_frames = 0;
                 arming.spawn_done_frames = 0;
@@ -653,9 +1076,10 @@ pub fn generation_state_driver(
                     {
                         let gen_cnt = gen_only_pending.iter().count();
                         let sel_cnt = selective_pending.iter().count();
+                        let ip_cnt = pending_inpass.0.iter().filter(|ev| ev.index == cur_pass.0).count();
                         println!(
-                            "[GenState][Generating] pending: gen_only={} selective={} (holding)",
-                            gen_cnt, sel_cnt
+                            "[GenState][Generating] pending: gen_only={} selective={} inpass_cur_pass={} (holding)",
+                            gen_cnt, sel_cnt, ip_cnt
                         );
                     }
                 }
@@ -664,10 +1088,10 @@ pub fn generation_state_driver(
                 stability.no_pending_stable_frames = stability.no_pending_stable_frames.saturating_add(1);
             }
 
-            // Readiness thresholds (minimal): no min frame wait, 1 stable frame, 1 idle frame
-            const MIN_GENERATING_FRAMES: u16 = 0;
-            const REQUIRED_STABLE_FRAMES: u8 = 1;
-            const REQUIRED_IDLE_FRAMES: u8 = 1;
+            // Readiness thresholds: wait a bit longer and require multiple stable/idle frames
+            const MIN_GENERATING_FRAMES: u16 = 15;
+            const REQUIRED_STABLE_FRAMES: u8 = 3;
+            const REQUIRED_IDLE_FRAMES: u8 = 3;
             // Require at least one observed activity reset before progressing out of Generating.
             let ready = arming.seen_activity
                 && generating_frames.frames_in_generating >= MIN_GENERATING_FRAMES
@@ -677,7 +1101,7 @@ pub fn generation_state_driver(
             if ready {
                 // Debounce before advancing
                 arming.spawn_done_frames = arming.spawn_done_frames.saturating_add(1);
-                const REQUIRED_FRAMES: u8 = 5;
+                const REQUIRED_FRAMES: u8 = 8;
                 if arming.spawn_done_frames >= REQUIRED_FRAMES {
                     info!("[GenState] Generating -> CollisionResolution");
                     next.set(GenerationState::CollisionResolution);
@@ -716,11 +1140,46 @@ pub fn generation_state_driver(
                 None => true,
             };
             if done {
-                println!("[GenState] NavMeshBuilding -> Completed");
-                next.set(GenerationState::Completed);
+                println!("[GenState] NavMeshBuilding -> PathResolve");
+                next.set(GenerationState::PathResolve);
             }
         }
+        GenerationState::PathResolve => {
+            // No-op here; advancement handled by advance_from_path_resolve
+        }
         GenerationState::Completed => {}
+    }
+}
+
+// Timer used to ensure at least one frame in PathResolve state
+#[derive(Resource, Default)]
+pub struct PathResolveTimer { pub frames: u16 }
+
+// On entering PathResolve, reset the timer
+pub fn reset_path_resolve_phase(mut timer: ResMut<PathResolveTimer>) {
+    timer.frames = 0;
+}
+
+// After one update in PathResolve, advance to Completed
+pub fn advance_from_path_resolve(
+    state: Res<State<GenerationState>>,
+    mut timer: ResMut<PathResolveTimer>,
+    mut next: ResMut<NextState<GenerationState>>,
+    resolved: Res<ResolvedPathSpawns>,
+) {
+    if state.get() != &GenerationState::PathResolve { return; }
+    timer.frames = timer.frames.saturating_add(1);
+    // Give path systems multiple frames to resolve (retries, asset readiness, etc.)
+    const PATH_RESOLVE_FRAMES: u16 = 60; // ~1s at 60 FPS
+    if timer.frames >= PATH_RESOLVE_FRAMES {
+        if !resolved.0.is_empty() {
+            println!("[GenState] PathResolve -> Generating (have {} buffered PathSpawnEvent)", resolved.0.len());
+            next.set(GenerationState::Generating);
+        } else {
+            println!("[GenState] PathResolve -> Completed");
+            next.set(GenerationState::Completed);
+        }
+        timer.frames = 0;
     }
 }
 
@@ -811,6 +1270,8 @@ pub enum GenerationState {
     Generating,
     CollisionResolution,
     NavMeshBuilding,
+    // New intermediate state where we resolve paths (now that navmesh is ready)
+    PathResolve,
     Completed,
 }
 
@@ -830,6 +1291,89 @@ pub struct SpawningStability {
 #[derive(Resource, Default)]
 pub struct GeneratingFrameCounter {
     pub frames_in_generating: u16,
+}
+
+// Buffer for path events authored during Generating; these will be flushed in PathResolve
+#[derive(Resource, Default)]
+pub struct PendingPathEvents {
+    pub to_tag: Vec<PathToTagSpawnEvent>,
+    pub to_all: Vec<PathToAllTagsSpawnEvent>,
+    pub plain: Vec<PathSpawnEvent>,
+}
+
+// Buffer for Nest events authored during PathResolve; these will be flushed in the next Generating
+#[derive(Resource, Default)]
+pub struct PendingNests(pub Vec<NestSpawnEvent>);
+
+// During Generating, capture path events and store them for PathResolve. Also eagerly create holders.
+pub fn buffer_path_events(
+    mut commands: Commands,
+    mut r_to_tag: EventReader<PathToTagSpawnEvent>,
+    mut r_to_all: EventReader<PathToAllTagsSpawnEvent>,
+    mut r_plain: EventReader<PathSpawnEvent>,
+    mut pending: ResMut<PendingPathEvents>,
+    store_query: Query<(Entity, &Tags)>,
+    mut activity: ResMut<SpawnActivity>,
+    mut highest: ResMut<HighestPassIndex>,
+    cur_pass: Option<Res<CurrentPass>>,
+) {
+    let mut any = false;
+    for ev in r_to_tag.read() {
+        if let Some(label) = ev.store_as.as_ref() {
+            let existing = store_query.iter().find(|(_, t)| t.contains(label)).map(|(e, _)| e);
+            if existing.is_none() {
+                let e = commands
+                    .spawn_empty()
+                    .insert(PathPolylineList::default())
+                    .insert(Tags(vec![label.clone()]))
+                    .insert(Name::new(format!("PathPolylineList: {}", label)))
+                    .id();
+                if let Some(parent) = ev.parent { commands.entity(e).set_parent(parent); }
+                eprintln!("[PathStore] (Buffer) Created holder 'PathPolylineList: {}' under parent {:?}", label, ev.parent);
+            }
+        }
+        pending.to_tag.push(ev.clone());
+        any = true;
+    }
+    for ev in r_to_all.read() {
+        if let Some(label) = ev.store_as.as_ref() {
+            let existing = store_query.iter().find(|(_, t)| t.contains(label)).map(|(e, _)| e);
+            if existing.is_none() {
+                let e = commands
+                    .spawn_empty()
+                    .insert(PathPolylineList::default())
+                    .insert(Tags(vec![label.clone()]))
+                    .insert(Name::new(format!("PathPolylineList: {}", label)))
+                    .id();
+                if let Some(parent) = ev.parent { commands.entity(e).set_parent(parent); }
+                eprintln!("[PathStore] (Buffer) Created holder 'PathPolylineList: {}' under parent {:?}", label, ev.parent);
+            }
+        }
+        pending.to_all.push(ev.clone());
+        if let Some(cp) = cur_pass.as_ref() { if highest.0 < cp.0.saturating_add(1) { highest.0 = cp.0.saturating_add(1); } }
+        any = true;
+    }
+    for ev in r_plain.read() {
+        pending.plain.push(ev.clone());
+        if let Some(cp) = cur_pass.as_ref() { if highest.0 < cp.0.saturating_add(1) { highest.0 = cp.0.saturating_add(1); } }
+        any = true;
+    }
+    if any { activity.idle_frames = 0; }
+}
+
+// On entering PathResolve, flush buffered path events back into the event system
+pub fn flush_path_events_on_enter(
+    mut pending: ResMut<PendingPathEvents>,
+    mut w_to_tag: EventWriter<PathToTagSpawnEvent>,
+    mut w_to_all: EventWriter<PathToAllTagsSpawnEvent>,
+    mut w_plain: EventWriter<PathSpawnEvent>,
+) {
+    if !pending.to_tag.is_empty() { eprintln!("[PathStore] Flushing {} PathToTag events to PathResolve", pending.to_tag.len()); }
+    if !pending.to_all.is_empty() { eprintln!("[PathStore] Flushing {} PathToAllTags events to PathResolve", pending.to_all.len()); }
+    if !pending.plain.is_empty() { eprintln!("[PathStore] Flushing {} PathSpawn events to PathResolve", pending.plain.len()); }
+    for ev in pending.to_tag.drain(..) { w_to_tag.send(ev); }
+    for ev in pending.to_all.drain(..) { w_to_all.send(ev); }
+    for ev in pending.plain.drain(..) { w_plain.send(ev); }
 }
 
 // Threshold used to decide which colliders should influence the navmesh.
@@ -1075,7 +1619,13 @@ pub fn mesh_spawn_listener(
     mut reader: EventReader<MeshSpawnEvent>,
     material_cache: Res<MaterialCache>,
     mut meshes: ResMut<Assets<Mesh>>,
+    // For direct PathBlend application
+    mut std_mats: ResMut<Assets<StandardMaterial>>,
+    mut ext_mats: ResMut<Assets<PathBlendMaterial>>,
+    mut ground_res: ResMut<GroundPathMaterial>,
+    asset_server: Res<AssetServer>,
     mut activity: ResMut<SpawnActivity>,
+    tag_query: Query<&Tags>,
 ) {
     let mut processed = false;
     for event in reader.read() {
@@ -1085,6 +1635,20 @@ pub fn mesh_spawn_listener(
                 (material_name.clone(), event.mesh.clone()) // No tiling factor adjustment needed
             }
             TMaterial::TiledMaterial { material_name, tiling_factor } => {
+                let mut mesh = event.mesh.clone();
+                if let Some(bevy::render::mesh::VertexAttributeValues::Float32x2(uvs)) =
+                    mesh.attribute_mut(Mesh::ATTRIBUTE_UV_0)
+                {
+                    for uv in uvs.iter_mut() {
+                        uv[0] *= tiling_factor.x;
+                        uv[1] *= tiling_factor.y;
+                    }
+                }
+                (material_name.clone(), mesh)
+            }
+            TMaterial::PathBlend { material_name, tiling_factor, .. } => {
+                // For early mesh setup, behave like TiledMaterial: clone and scale UVs.
+                // The actual PathBlend material handle is created later when inserting components.
                 let mut mesh = event.mesh.clone();
                 if let Some(bevy::render::mesh::VertexAttributeValues::Float32x2(uvs)) =
                     mesh.attribute_mut(Mesh::ATTRIBUTE_UV_0)
@@ -1109,20 +1673,65 @@ pub fn mesh_spawn_listener(
             let entity_id = commands.spawn_empty().id();
 
             // Then, use commands.entity() to insert components
-            commands.entity(entity_id)
-                .insert(Mesh3d(mesh_handle))
-                .insert(MeshMaterial3d((*material_handle).clone()))
-                .insert(Transform::from(event.transform.clone()))
-                .insert(Name::new("Mesh"))
-                .insert(Collider::cuboid(collider_size.x, collider_size.y, collider_size.z))
-                .insert(ActiveEvents::COLLISION_EVENTS | ActiveEvents::CONTACT_FORCE_EVENTS)
-                .insert(ActiveCollisionTypes::all())
-                .insert(QueuedNavMeshAffector)
-                .insert(InheritedVisibility::default());
+            // Branch on material type: regular StandardMaterial vs PathBlendMaterial
+            match &event.material {
+                TMaterial::PathBlend { near_albedo_path, near_metallic_roughness_path, near_ao_path, .. } => {
+                    // Build PathBlend material from the cached base StandardMaterial
+                    let base = std_mats.get(material_handle).cloned().unwrap_or_else(StandardMaterial::default);
+                    // Tuned defaults for high-visibility path blending
+                    let mut p = PathBlendParams::default();
+                    p.fade_radius = 0.2;
+                    p.min_blend = 0.0;
+                    p.max_blend = 1.0;
+                    p.near_base_color = Vec4::new(0.32, 0.24, 0.16, 1.0);
+                    p.near_metallic = 0.0;
+                    p.near_roughness = 0.95;
+                    p.thickness_scale = 1.0;
+                    p.base_width = 0.5;
+                    p.set_falloff_mode(crate::materials::path_blend::falloff_mode::LINEAR);
+                    p.set_invert(false);
+                    // Initially no segments; they will be supplied via PathWorldPointsEvent
+                    p.clear_segments();
+                    let near_albedo = near_albedo_path.as_ref().map(|p| asset_server.load(p.as_str()));
+                    let near_mr = near_metallic_roughness_path.as_ref().map(|p| asset_server.load(p.as_str()));
+                    let near_ao = near_ao_path.as_ref().map(|p| asset_server.load(p.as_str()));
+                    let handle = make_path_blend_material(&mut ext_mats, base, p, &[], near_albedo, near_mr, near_ao);
 
-            // Set parent if applicable
+                    commands.entity(entity_id)
+                        .insert(Mesh3d(mesh_handle))
+                        .insert(MeshMaterial3d(handle.clone()))
+                        .insert(Transform::from(event.transform.clone()))
+                        .insert(Name::new("Mesh"))
+                        .insert(Collider::cuboid(collider_size.x, collider_size.y, collider_size.z))
+                        .insert(ActiveEvents::COLLISION_EVENTS | ActiveEvents::CONTACT_FORCE_EVENTS)
+                        .insert(ActiveCollisionTypes::all())
+                        .insert(QueuedNavMeshAffector)
+                        .insert(InheritedVisibility::default());
+
+                    // Set the ground path material handle if not already set
+                    // Always update to the latest spawned ground material so subsequent generations bind correctly
+                    ground_res.0 = Some(handle);
+                }
+                _ => {
+                    commands.entity(entity_id)
+                        .insert(Mesh3d(mesh_handle))
+                        .insert(MeshMaterial3d((*material_handle).clone()))
+                        .insert(Transform::from(event.transform.clone()))
+                        .insert(Name::new("Mesh"))
+                        .insert(Collider::cuboid(collider_size.x, collider_size.y, collider_size.z))
+                        .insert(ActiveEvents::COLLISION_EVENTS | ActiveEvents::CONTACT_FORCE_EVENTS)
+                        .insert(ActiveCollisionTypes::all())
+                        .insert(QueuedNavMeshAffector)
+                        .insert(InheritedVisibility::default());
+                }
+            }
+
+            // Set parent if applicable, and propagate Tags from the parent so matching works
             if let Some(parent) = event.parent {
                 commands.entity(entity_id).set_parent(parent);
+                if let Ok(tags) = tag_query.get(parent) {
+                    commands.entity(entity_id).insert(tags.clone());
+                }
             }
         } else {
             println!("Material not found: {}", material_name);
@@ -1147,7 +1756,7 @@ pub fn scene_spawn_listener(
             .insert(InheritedVisibility::default())
             .id();
 
-        if let StructureKey::Object { path, collider, offset, ownership, selectable, object_type } = &event.data {
+        if let StructureKey::Object { path, collider, offset, ownership, selectable, object_type, visibility } = &event.data {
             let scene_handle: Handle<Scene> = asset_server.load(path);
 
             commands.entity(parent_entity).with_children(|parent| {
@@ -1165,6 +1774,26 @@ pub fn scene_spawn_listener(
                 .insert(Name::new(filename.to_string()))
                 .insert(ownership.clone())
                 .insert(object_type.clone());
+
+            // Apply authored visibility mode, defaulting to Visible when unspecified
+            let mode = visibility.clone().unwrap_or(crate::core::structure_key::VisibilityMode::Visible);
+            match mode {
+                crate::core::structure_key::VisibilityMode::Visible => {
+                    commands.entity(parent_entity).insert(Visibility::Visible);
+                    #[cfg(feature = "debug")]
+                    println!("[Spawn][Visibility] {:?} -> Visible", parent_entity);
+                }
+                crate::core::structure_key::VisibilityMode::Hidden => {
+                    commands.entity(parent_entity).insert(Visibility::Hidden);
+                    #[cfg(feature = "debug")]
+                    println!("[Spawn][Visibility] {:?} -> Hidden", parent_entity);
+                }
+                crate::core::structure_key::VisibilityMode::Inherit => {
+                    // Do not insert Visibility; allow inheritance from ancestors
+                    #[cfg(feature = "debug")]
+                    println!("[Spawn][Visibility] {:?} -> Inherit (no explicit Visibility)", parent_entity);
+                }
+            }
 
             if *selectable {
                 commands.entity(parent_entity).insert(Selectable { is_selected: false });

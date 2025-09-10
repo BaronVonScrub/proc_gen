@@ -18,6 +18,11 @@ pub struct MeshSpawnEvent {
 }
 
 #[derive(Debug, Clone, Event)]
+pub struct PathWorldPointsEvent {
+    pub points: Vec<Vec3>,
+}
+
+#[derive(Debug, Clone, Event)]
 pub struct RandDistDirSpawnEvent {
     pub reference: StructureReference,
     pub dist_min: f32,
@@ -208,6 +213,25 @@ pub struct PathToTagSpawnEvent {
     pub spread: SpreadData,
     pub count: u32,
     pub wobble: Option<WobbleParams>,
+    // Optional: if provided, the computed world polyline will be stored on an entity
+    // carrying this label in its Tags. If such an entity doesn't exist, one will be created.
+    pub store_as: Option<String>,
+    pub transform: EulerTransform,
+    pub parent: Option<Entity>,
+}
+
+#[derive(Debug, Clone, Event)]
+pub struct PathToAllTagsSpawnEvent {
+    pub reference: StructureReference,
+    pub start: Vec3,
+    pub manual_points: Option<Vec<Vec3>>,
+    pub tag: String,
+    pub tension: f32,
+    pub spread: SpreadData,
+    pub count: u32,
+    pub wobble: Option<WobbleParams>,
+    // Optional: same behavior as PathToTagSpawnEvent
+    pub store_as: Option<String>,
     pub transform: EulerTransform,
     pub parent: Option<Entity>,
 }

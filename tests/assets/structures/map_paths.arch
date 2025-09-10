@@ -1,0 +1,43 @@
+(
+    structure_name: "Map Paths",
+    tags: [],
+    data: [
+        // Corner A: place a tagged point that the path will target
+        (Nest(Raw(
+            structure: (
+                structure_name: "PathEnd Marker",
+                tags: ["PathEnd"],
+                data: [],
+            ),
+            ownership: Team(1),
+        )), (
+            translation: (-6.0, 0.0, -6.0),
+            rotation: (0.0, 0.0, 0.0),
+            scale: (1.0, 1.0, 1.0),
+        )),
+
+        // From opposite corner B, pathfind to the nearest PathEnd tag (no markers spawned; we only use the path for the shader)
+        (PathToTag(
+            reference: Raw(
+                structure: (
+                    structure_name: "Path Marker (unused)",
+                    tags: [],
+                    data: [],
+                ),
+                ownership: Team(1),
+            ),
+            start: (0.0, 0.0, 0.0),
+            manual_points: None,
+            tag: "PathEnd",
+            tension: 0.0,
+            spread: Constant(1.0),
+            count: 0,
+            wobble: None,
+            store_as: Some("GroundPath"),
+        ), (
+            translation: (6.0, 0.0, 6.0),
+            rotation: (0.0, 0.0, 0.0),
+            scale: (1.0, 1.0, 1.0),
+        )),
+    ],
+)

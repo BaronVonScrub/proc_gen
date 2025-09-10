@@ -14,6 +14,7 @@ use proc_gen::core::generator_plugin::GeneratorPlugin;
 use oxidized_navigation::{OxidizedNavigationPlugin, NavMeshSettings};
 use oxidized_navigation::debug_draw::OxidizedNavigationDebugDrawPlugin;
 use proc_gen::core::components::MainDirectionalLight;
+use bevy_gizmos::config::{GizmoConfigStore, DefaultGizmoConfigGroup};
 
 mod input_manager;
 mod camera;
@@ -78,11 +79,13 @@ fn main() {
         app.add_systems(Update, sync_sun_to_main_dir_light);
     }
 
+    // Setup map generator (registers MaterialAutoloader and related systems)
+    app.add_plugins(GeneratorPlugin);
+
+    // Only register generation systems AFTER the generator/autoloader plugin,
+    // so the autoloader's OnEnter(GameState::Playing) runs before generate_map.
     app.add_systems(OnEnter(proc_gen::management::material_autoloader::GameState::Playing), generation::generate_map);
     app.add_systems(Update, generation::reset_on_space);
-
-    // Setup map generator
-    app.add_plugins(GeneratorPlugin);
 
     // Setup input system
     app.add_plugins(crate::input_manager::InputPlugin);
@@ -131,6 +134,9 @@ fn main() {
     // Setup object logic
     app.add_plugins(proc_gen::spawning::object_logic::ObjectLogicPlugin);
 
+    // Ensure gizmos render on top of scene geometry for clarity
+    app.add_systems(Startup, set_gizmos_on_top);
+
     app.run();
 }
 
@@ -170,4 +176,11 @@ fn enable_navmesh_debug(
     if let Some(mut draw) = maybe_draw {
         draw.0 = true;
     }
+}
+
+// Configure gizmos to render on top by applying a negative depth bias
+fn set_gizmos_on_top(mut store: ResMut<GizmoConfigStore>) {
+    // Get the default gizmo config and set a negative depth bias so lines render over geometry
+    let (config, _group) = store.config_mut::<DefaultGizmoConfigGroup>();
+    config.depth_bias = -1.0;
 }

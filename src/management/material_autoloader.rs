@@ -44,7 +44,7 @@ impl Plugin for MaterialAutoloader {
                     .continue_to_state(GameState::Playing) // ✅ Move to Playing when done
                     .load_collection::<MaterialTextures>(), // ✅ Load textures!
             )
-            .add_systems(OnEnter(GameState::Playing), preload_materials_system) // ✅ Convert textures into materials
+            .add_systems(OnExit(GameState::Loading), preload_materials_system) // ✅ Convert textures into materials before entering Playing
             //.add_systems(OnEnter(GameState::Playing), check_l oaded_assets)
             ; // ✅ Debug check
     }
@@ -89,8 +89,9 @@ fn preload_materials_system(
             base_color_texture: base_tex,
             occlusion_texture: ao_tex,
             normal_map_texture: normal_tex,
-            metallic_roughness_texture: met_rough_tex,
-            metallic: 0.1,
+            metallic_roughness_texture: met_rough_tex.clone(),
+            // If there is no packed metallicRoughness texture, drive the metallic channel fully (1.0)
+            metallic: if met_rough_tex.is_some() { 0.1 } else { 1.0 },
             perceptual_roughness: 0.9,
             // Many texture libraries author normal maps for DirectX (-Y). Flip to match Bevy's expected +Y.
             flip_normal_map_y: true,
@@ -107,13 +108,15 @@ fn preload_materials_system(
 fn extract_tex_data(tex_name: &str) -> (String, String) {
     // Support multiple common conventions for texture suffixes
     let texture_types = ["albedo", "ao", "normal", "met_roughness", "metallicRoughness"];
-    let parts: Vec<&str> = tex_name.split('/').collect();
+    // Normalize separators in case any path contains backslashes
+    let normalized = tex_name.replace('\\', "/");
+    let parts: Vec<&str> = normalized.split('/').collect();
     let materials_index = parts.iter().position(|&r| r == "materials").unwrap_or(0);
     let material_name = parts.get(materials_index + 1).unwrap_or(&"").to_string();
 
     let texture_type = texture_types.iter()
         .find_map(|&t| {
-            if tex_name.contains(&format!("_{}", t)) {
+            if normalized.contains(&format!("_{}", t)) {
                 Some(t.to_string())
             } else {
                 None

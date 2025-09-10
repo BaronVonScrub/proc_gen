@@ -1,0 +1,30 @@
+(
+    meta_format_version: "1.0",
+    processed_info: Some((
+        hash: (227, 237, 61, 152, 58, 38, 165, 13, 89, 197, 250, 130, 19, 50, 170, 221, 203, 205, 47, 53, 188, 112, 174, 29, 226, 250, 84, 68, 221, 253, 3, 188),
+        full_hash: (253, 224, 45, 6, 105, 66, 143, 115, 189, 42, 118, 49, 0, 98, 112, 198, 145, 223, 70, 217, 85, 67, 77, 184, 141, 209, 182, 97, 111, 239, 121, 61),
+        process_dependencies: [],
+    )),
+    asset: Load(
+        loader: "bevy_image::image_loader::ImageLoader",
+        settings: (
+            format: Format(Basis),
+            is_srgb: true,
+            sampler: Descriptor((
+                label: None,
+                address_mode_u: Repeat,
+                address_mode_v: Repeat,
+                address_mode_w: ClampToEdge,
+                mag_filter: Linear,
+                min_filter: Linear,
+                mipmap_filter: Linear,
+                lod_min_clamp: 0.0,
+                lod_max_clamp: 32.0,
+                compare: None,
+                anisotropy_clamp: 1,
+                border_color: None,
+            )),
+            asset_usage: ("MAIN_WORLD | RENDER_WORLD"),
+        ),
+    ),
+)

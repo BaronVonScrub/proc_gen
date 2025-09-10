@@ -19,6 +19,13 @@ use crate::spawning::object_logic::{ObjectType, Ownership};
 use bevy::ecs::world::World;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+pub enum VisibilityMode {
+    Inherit,
+    Visible,
+    Hidden,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum StructureKey {
     Object {
         path: String,
@@ -27,6 +34,8 @@ pub enum StructureKey {
         ownership: Ownership,
         selectable: bool,
         object_type: ObjectType,
+        #[serde(default)]
+        visibility: Option<VisibilityMode>,
     },
     #[serde(with = "SerializablePointLight")]
     PointLight(PointLight),
@@ -114,6 +123,18 @@ pub enum StructureKey {
         spread: SpreadData,
         count: u32,
         wobble: Option<WobbleParams>,
+        store_as: Option<String>,
+    },
+    PathToAllTags {
+        reference: StructureReference,
+        start: Vec3,
+        manual_points: Option<Vec<Vec3>>, // optional local-space control points
+        tag: String,
+        tension: f32,
+        spread: SpreadData,
+        count: u32,
+        wobble: Option<WobbleParams>,
+        store_as: Option<String>,
     },
     RandDistDir {
         reference: StructureReference,
@@ -190,6 +211,10 @@ impl StructureKey {
                 StructureReference::Raw { structure, .. } => format!("PathToTag {} -> {:?}", tag, structure.structure_name.clone()),
                 StructureReference::Ref { structure, .. } => format!("PathToTag {} -> {:?}", tag, structure.clone()),
             },
+            StructureKey::PathToAllTags { reference, tag, .. } => match reference {
+                StructureReference::Raw { structure, .. } => format!("PathToAllTags {} -> {:?}", tag, structure.structure_name.clone()),
+                StructureReference::Ref { structure, .. } => format!("PathToAllTags {} -> {:?}", tag, structure.clone()),
+            },
             StructureKey::Reflection { reference, .. } => match reference {
                 StructureReference::Raw { structure, .. } => format!("Reflect {:?}", structure.structure_name.clone()),
                 StructureReference::Ref { structure, .. } => format!("Reflect {:?}", structure.clone()),
@@ -227,6 +252,7 @@ impl StructureKey {
             StructureKey::NoiseSpawn { reference, .. } => Self::extract_tags(reference),
             StructureKey::PathSpawn { reference, .. } => Self::extract_tags(reference),
             StructureKey::PathToTag { reference, .. } => Self::extract_tags(reference),
+            StructureKey::PathToAllTags { reference, .. } => Self::extract_tags(reference),
             StructureKey::Reflection { reference, .. } => Self::extract_tags(reference),
             StructureKey::RandDistDir { reference, .. } => Self::extract_tags(reference),
             _ => Vec::new(), // Other variants do not contain a StructureReference
@@ -369,7 +395,7 @@ impl StructureKey {
                         parent,
                     });
                 }
-                StructureKey::PathToTag { reference, start, manual_points, tag, tension, spread, count, wobble } => {
+                StructureKey::PathToTag { reference, start, manual_points, tag, tension, spread, count, wobble, store_as } => {
                     world.send_event(PathToTagSpawnEvent {
                         reference,
                         start,
@@ -379,6 +405,22 @@ impl StructureKey {
                         spread,
                         count,
                         wobble,
+                        store_as,
+                        transform,
+                        parent,
+                    });
+                }
+                StructureKey::PathToAllTags { reference, start, manual_points, tag, tension, spread, count, wobble, store_as } => {
+                    world.send_event(PathToAllTagsSpawnEvent {
+                        reference,
+                        start,
+                        manual_points,
+                        tag,
+                        tension,
+                        spread,
+                        count,
+                        wobble,
+                        store_as,
                         transform,
                         parent,
                     });

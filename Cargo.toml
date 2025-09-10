@@ -37,6 +37,9 @@ bevy = { version = "0.15.3", default-features = false, features = [
     "basis-universal",
     "serialize"
 ] }
+bevy_render = "0.15.3"
+bevy_asset = "0.15.3"
+bevy_reflect = "0.15.3"
 image = "0.25.1"
 glob = "0.3.1"
 bevy-inspector-egui = "0.29.1"

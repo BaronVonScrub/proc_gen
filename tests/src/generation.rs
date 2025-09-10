@@ -17,6 +17,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use proc_gen::management::structure_management::clear_structure_cache;
 #[cfg(feature = "debug")]
 use proc_gen::event_system::event_listeners::AllPathsDebug;
+use bevy_pbr::StandardMaterial;
+use proc_gen::materials::path_blend::{PathBlendMaterial, PathBlendParams, falloff_mode, GroundPathMaterial, make_path_blend_material};
 
 #[derive(Component)]
 pub(crate) struct GeneratedRoot;
@@ -49,9 +51,13 @@ fn send_generation_events(c: &mut Commands, parent: Option<Entity>) {
                 rotation: (-90.0, 0.0, 0.0),
                 scale: (1.0, 1.0, 1.0),
             },
-            material: TMaterial::TiledMaterial {
+            material: TMaterial::PathBlend {
                 material_name: "Grass".to_string(),
-                tiling_factor: Vec2::new(5.0, 5.0),
+                tiling_factor: Vec2::new(6.0, 6.0),
+                // Blend toward the Soil albedo near the path
+                near_albedo_path: Some("materials/Soil/TCom_Ground_Soil3_2x2_1K_albedo.png".to_string()),
+                near_metallic_roughness_path: Some("materials/Soil/TCom_Ground_Soil3_2x2_1K_metallicRoughness.png".to_string()),
+                near_ao_path: Some("materials/Soil/TCom_Ground_Soil3_2x2_1K_ao.png".to_string()),
             },
             parent,
         });
@@ -112,10 +118,21 @@ fn send_generation_events(c: &mut Commands, parent: Option<Entity>) {
                 rotation: (-90.0, 0.0, 0.0),
                 scale: (1.0, 1.0, 1.0),
             },
-            material: TMaterial::TiledMaterial {
+            material: TMaterial::PathBlend {
                 material_name: "Grass".to_string(),
                 tiling_factor: Vec2::new(6.0, 6.0),
+                // Blend toward the Soil albedo near the path
+                near_albedo_path: Some("materials/Soil/TCom_Ground_Soil3_2x2_1K_albedo.png".to_string()),
+                near_metallic_roughness_path: Some("materials/Soil/TCom_Ground_Soil3_2x2_1K_metallicRoughness.png".to_string()),
+                near_ao_path: Some("materials/Soil/TCom_Ground_Soil3_2x2_1K_ao.png".to_string()),
             },
+            parent,
+        });
+
+        // Spawn the path demo structure that places a PathEnd tag and computes a path to it from the opposite corner
+        spawn!(c, StructureSpawnEvent {
+            structure: "map_paths".to_string(),
+            transform: Default::default(),
             parent,
         });
     }

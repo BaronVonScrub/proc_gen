@@ -15,6 +15,7 @@ impl Plugin for EventSystemPlugin {
         app.init_resource::<SpawnActivity>();
         app.init_resource::<GenerationAdvanceArming>();
         app.init_resource::<NavMeshPriorityThreshold>();
+        app.init_resource::<PathResolveTimer>();
         #[cfg(feature = "debug")]
         {
             app.init_resource::<AllPathsDebug>();
@@ -22,6 +23,8 @@ impl Plugin for EventSystemPlugin {
         app.init_resource::<CurrentPass>();
         app.init_resource::<HighestPassIndex>();
         app.init_resource::<PendingInPass>();
+        app.init_resource::<PendingPathEvents>();
+        app.init_resource::<ResolvedPathSpawns>();
         app.init_state::<GenerationState>();
         // Registering all events
         app.add_event::<MeshSpawnEvent>()
@@ -48,11 +51,13 @@ impl Plugin for EventSystemPlugin {
             .add_event::<NoiseSpawnEvent>()
             .add_event::<PathSpawnEvent>()
             .add_event::<PathToTagSpawnEvent>()
+            .add_event::<PathToAllTagsSpawnEvent>()
+            .add_event::<PathWorldPointsEvent>()
             .add_event::<ReflectionSpawnEvent>()
             .add_event::<SelectiveReplacementSpawnEvent>();
         app.add_event::<InPassSpawnEvent>();
 
-        // Registering event handling systems (only needed during Generating)
+        // Registering non-path event handling systems (only needed during Generating)
         app.add_systems(Update, (
             mesh_spawn_listener,
             scene_spawn_listener,
@@ -65,6 +70,8 @@ impl Plugin for EventSystemPlugin {
             distance_fog_spawn_listener,
             sound_effect_spawn_listener,
             background_music_spawn_listener,
+            // Materialize path-driven spawns during Generating (not PathResolve)
+            path_spawn_listener,
             nest_spawn_listener,
         ).run_if(in_state(GenerationState::Generating)));
 
@@ -82,10 +89,11 @@ impl Plugin for EventSystemPlugin {
             app.add_systems(Update, draw_all_paths_debug);
         }
 
-        // Generation-time systems only
+        // Generation-time systems only (excluding pathfinding, which is buffered)
         app.add_systems(Update, (
             // Tick spawn activity every frame; individual listeners will reset this when they process events
             tick_spawn_activity,
+            buffer_path_events,
             choose_spawn_listener,
             choose_some_spawn_listener,
             in_pass_spawn_listener,
@@ -97,9 +105,6 @@ impl Plugin for EventSystemPlugin {
             loop_spawn_listener,
             nesting_loop_spawn_listener,
             noise_spawn_listener,
-            path_spawn_listener,
-            // Safe to run in Generating now: it only marks activity when a path actually resolves
-            path_to_tag_spawn_listener,
             reflection_spawn_listener,
             selective_replacement_spawn_listener,
             collider_priority_despawn_system,
@@ -107,11 +112,15 @@ impl Plugin for EventSystemPlugin {
             tick_generating_counter,
         ).run_if(in_state(GenerationState::Generating)));
 
-        // Post-generation path processing: once navmesh is available, these can resolve
+        // Path resolution window: run all pathfinding and material application here
+        app.add_systems(OnEnter(GenerationState::PathResolve), (reset_path_resolve_phase, flush_path_events_on_enter));
         app.add_systems(Update, (
             path_to_tag_spawn_listener,
-            path_spawn_listener,
-        ).run_if(in_state(GenerationState::Completed)));
+            path_to_all_tags_spawn_listener,
+            apply_stored_polylines_to_tagged_pathblend,
+            apply_world_path_points_to_material,
+        ).run_if(in_state(GenerationState::PathResolve)));
+        app.add_systems(Update, advance_from_path_resolve);
 
         // Single state driver for all GenerationState transitions (always scheduled)
         app.add_systems(Update, generation_state_driver);
@@ -125,8 +134,8 @@ impl Plugin for EventSystemPlugin {
 
         // On entering navmesh build phase, activate queued affectors
         app.add_systems(OnEnter(GenerationState::NavMeshBuilding), activate_navmesh_affectors);
-        // On entering Generating, reset counters
-        app.add_systems(OnEnter(GenerationState::Generating), reset_generating_phase);
+        // On entering Generating, reset counters and flush any resolved PathSpawnEvent from PathResolve
+        app.add_systems(OnEnter(GenerationState::Generating), (reset_generating_phase, flush_resolved_paths_on_enter_generating));
         // On entering Completed, advance pass if more passes exist
         app.add_systems(OnEnter(GenerationState::Completed), advance_pass_or_finish);
         app.add_systems(Startup, spawn_generation_state_overlay);

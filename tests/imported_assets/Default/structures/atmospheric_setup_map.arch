@@ -1,0 +1,51 @@
+(
+    structure_name: "Atmospheric Setup (Map)",
+    tags: [],
+    data: [
+        (MainDirectionalLight((
+            // Neutral daylight sun
+            color: Srgba((red:0.98,green:0.97,blue:0.92,alpha:1.0)),
+            illuminance: 2800.0,
+            shadows_enabled: true,
+            shadow_depth_bias: 0.02,
+            shadow_normal_bias: 1.8,
+            shadow_map_near_z: 10.0,
+        )), (
+            translation: (0.0, 0.0, 0.0),
+            rotation: (-60.0, 35.0, 0.0),
+            scale: (1.0, 1.0, 1.0),
+        )),
+        (AmbientLight((
+            color: Srgba((red:1.0,green:1.0,blue:1.0,alpha:1.0)),
+            brightness: 300.0,
+        )), (
+            translation: (0.0, 0.0, 0.0),
+            rotation: (0.0, 0.0, 0.0),
+            scale: (1.0, 1.0, 1.0),
+        )),
+        (DistanceFog((
+            color: Srgba((red: 0.82,green: 0.88,blue: 0.98,alpha: 0.85)),
+            falloff: Atmospheric(
+                extinction: Vec3(0.012,0.012,0.012),
+                inscattering: Vec3(0.002,0.002,0.002)
+            ),
+            directional_light_color: Srgba((red: 1.0,green: 0.98,blue: 0.90,alpha: 1.0)),
+            directional_light_exponent: 28.0,
+        )), (
+            translation: (0.0, 0.0, 0.0),
+            rotation: (0.0, 0.0, 0.0),
+            scale: (1.0, 1.0, 1.0),
+        )),
+        (AtmosphereNishita(
+            sun_position: Vec3(0.0, 1.0, 0.3),
+            rayleigh_multiplier: Vec3(5.0, 2.0, 0.2),
+            mie_multiplier: 2.0,
+            mie_direction: 0.6,
+            align_to_main_light: true,
+        ), (
+            translation: (0.0, 0.0, 0.0),
+            rotation: (0.0, 0.0, 0.0),
+            scale: (1.0, 1.0, 1.0),
+        )),
+    ],
+)
